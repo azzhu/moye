@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+import { launchMoye } from './moye-cli.mjs';
+
+launchMoye(process.argv.slice(2)).catch(error => {
+  console.error(`墨页：${error.message}`);
+  process.exitCode = 1;
+});

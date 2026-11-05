@@ -1,0 +1,14 @@
+{
+  "name": "inkwell-markdown",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": { "moye": "./moye" },
+  "scripts": {
+    "dev": "node server.mjs",
+    "start": "node server.mjs",
+    "build": "node build.mjs",
+    "test": "node --test",
+    "open": "node ./moye"
+  }
+}
