@@ -10,13 +10,13 @@ const functionSource = name => main.match(new RegExp(`function ${name}\\([^]*?\\
 function page(storage = new Map()) {
   const root = { dataset: {}, style: { values: new Map([['--document-font-size', '19px'], ['--content-width', '960px']]),
     setProperty(key, value) { this.values.set(key, value); } } };
-  const elements = { '#settings-current': {}, '#appearance-feedback': {} };
+  const elements = { '#settings-current': {}, '#appearance-feedback': {}, '#modal': { open: true, close() { this.open = false; } } };
   const options = READING_STYLES.map(style => ({ dataset: { readingStyle: style.id }, setAttribute(key, value) { this[key] = value; } }));
   const context = vm.createContext({
     localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
     migrateHistory: documents => documents, APPEARANCE_STORAGE_KEY, resolveReadingStyle, applyReadingStyle,
     document: { documentElement: root }, outlineTracking: { refresh() {} },
-    $: selector => elements[selector], $$: () => options,
+    $: selector => elements[selector], $$: () => options, toast() {},
   });
   vm.runInContext(startup + '\n' + ['applyTheme', 'selectReadingStyle'].map(functionSource).join('\n'), context);
   return { context, root, elements, options, storage };
@@ -28,7 +28,9 @@ test('style selection survives reload separately from documents and preserves re
   const storage = new Map([['inkwell.workspace.v1', saved]]);
   const first = page(storage);
   for (const style of READING_STYLES) {
+    first.elements['#modal'].open = true;
     first.context.selectReadingStyle(style.id);
+    assert.equal(first.elements['#modal'].open, false, 'selecting a style closes settings immediately');
     assert.equal(first.root.dataset.style, style.id);
     assert.equal(first.options.filter(option => option['aria-pressed'] === 'true').length, 1);
     assert.equal(storage.get('inkwell.workspace.v1'), saved, 'changing appearance must not save or alter documents');
