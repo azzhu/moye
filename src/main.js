@@ -8,6 +8,7 @@ import { localFileFromHash } from './local-file-handle.js';
 import { refreshLocalImages } from './local-images.js';
 import { DirectoryImageLoader, imageDirectoryKey, validateImageDirectory } from './directory-images.js';
 import { refreshCodeCopyButtons } from './code-copy.js';
+import { installOutlineTracking } from './outline-tracking.js';
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const STORAGE_KEY = 'inkwell.workspace.v1';
@@ -86,7 +87,7 @@ function button(action, name, label, cls = '', extra = '') {
 $('#app').innerHTML = `
   <aside class="sidebar">
     <a class="brand" href="/" aria-label="墨页首页"><span class="brand-mark">${icon('feather', 23)}</span><span>墨页<span class="brand-en">INKWELL</span></span></a>
-    <section class="sidebar-document-info" aria-label="当前文档" hidden><input id="document-title" class="document-title" aria-label="文档名称" value="" maxlength="100"><div class="document-meta"><span>${icon('clock', 13)}<span id="updated-label">刚刚编辑</span></span><span class="meta-dot">·</span><span id="heading-words">0 字</span></div><div class="sidebar-document-type">Markdown 文档</div></section>
+    <section class="sidebar-document-info" aria-label="当前文档" hidden><h2 id="document-title" class="document-title" aria-label="文档名称"></h2><div class="document-meta"><span>${icon('clock', 13)}<span id="updated-label">刚刚编辑</span></span><span class="meta-dot">·</span><span id="heading-words">0 字</span></div><div class="sidebar-document-type">Markdown 文档</div></section>
     <button class="new-button" data-action="open">${icon('folder', 17)}<span>打开文档</span><kbd>⌘ O</kbd></button>
     <div class="section-caption history-caption"><span>历史记录</span><span class="history-count" id="history-count">0 / 20</span></div>
     <div class="document-list" id="document-list" aria-label="历史记录"></div>
@@ -94,17 +95,13 @@ $('#app').innerHTML = `
       <div class="sidebar-divider"></div>
       <button class="nav-item" data-action="help">${icon('help')}<span>使用指南</span><span class="external-arrow">↗</span></button>
       <button class="nav-item" data-action="theme">${icon('sun')}<span id="theme-label">浅色模式</span><span class="theme-toggle"><i></i></span></button>
-      <div class="local-note"><span class="local-dot"></span>修改自动写回原文件<span>v1.0</span></div>
+      <div class="local-note sidebar-save-status"><span class="local-dot" aria-hidden="true"></span><button class="save-state" id="save-state" data-action="save-file" title="保存到原始文件 / 重新授权" aria-live="polite"></button></div>
     </div>
   </aside>
   <div class="main-shell">
-    <header class="topbar">
-      <div class="breadcrumbs" aria-label="文档路径">${button('sidebar', 'menu', '打开侧边栏', 'mobile-menu')}${icon('folder', 16)}<span class="breadcrumb-current" id="document-path"></span></div>
-      <div class="top-actions"><button class="save-state" id="save-state" data-action="save-file" title="保存到原始文件 / 重新授权"></button><div class="dropdown-wrap">${button('more', 'more', '更多操作')}<div class="popover more-menu" id="more-menu" hidden><button data-action="rename">${icon('file', 16)}重命名文档</button></div></div></div>
-    </header>
     <main class="workspace">
       <section class="editor-card" aria-label="Markdown 编辑器">
-        <div class="format-toolbar"><div class="toolbar-group">${button('undo', 'undo', '撤销 ⌘ Z')}${button('redo', 'redo', '重做 ⌘ ⇧ Z')}</div><span class="toolbar-separator"></span><div class="dropdown-wrap"><button class="heading-select" data-action="headings"><span id="format-label">正文</span>${icon('down', 12)}</button><div id="headings-menu" class="popover headings-menu" hidden><button data-heading="p">正文</button><button data-heading="h1">一级标题 <small>H1</small></button><button data-heading="h2">二级标题 <small>H2</small></button><button data-heading="h3">三级标题 <small>H3</small></button></div></div><span class="toolbar-separator"></span><div class="toolbar-group">${button('bold', 'bold', '加粗 ⌘ B')}${button('italic', 'italic', '斜体 ⌘ I')}${button('strike', 'strike', '删除线')}${button('inline-code', 'code', '行内代码')}${button('link', 'link', '插入链接 ⌘ K')}</div><span class="toolbar-separator"></span><div class="toolbar-group">${button('bullet', 'list', '无序列表')}${button('number', 'ordered', '有序列表')}${button('quote', 'quote', '引用')}${button('table', 'table', '插入表格')}</div><span class="toolbar-separator toolbar-last"></span><div class="dropdown-wrap"><button class="insert-button" data-action="insert">${icon('plus', 15)}<span>插入</span>${icon('down', 11)}</button><div id="insert-menu" class="popover insert-menu" hidden><button data-action="task">${icon('task', 16)}任务清单</button><button data-action="codeblock">${icon('code', 16)}代码块</button><button data-action="rule">${icon('rule', 16)}分割线</button><button data-action="table">${icon('table', 16)}表格</button><button data-action="image">${icon('file', 16)}图片链接</button></div></div><span class="toolbar-spacer" title="双击进入或退出文档全屏"></span><div class="view-options"><button class="width-button image-directory-button" data-action="image-directory" aria-label="授权图片目录" title="授权图片目录：选择 Markdown 所在文件夹（只读）" hidden>${icon('folder', 15)}<span>图片目录</span></button><div class="dropdown-wrap"><button class="width-button" data-action="width" aria-label="调整可视化宽度" aria-expanded="false">${icon('split', 15)}<span>宽度</span>${icon('down', 11)}</button><div class="popover width-menu" id="width-menu" hidden><label for="content-width">正文宽度 <output id="width-value">1080 px</output></label><input id="content-width" type="range" min="480" max="1400" step="20" aria-label="可视化正文宽度"><div class="width-presets"><button data-width="640">紧凑</button><button data-width="960">宽屏</button><button data-width="full">铺满</button></div><p>正文宽度受当前可视化区域限制。</p><button class="width-reset" data-action="reset-width">恢复默认宽度</button></div></div><button class="width-button mode-setting" data-action="display-mode" aria-label="切换显示模式"><span>切换显示模式</span></button><div class="dropdown-wrap"><button class="font-button" data-action="font-size" aria-label="调整文档字体大小" aria-expanded="false" title="调整文档字体大小"><span aria-hidden="true">A<span class="font-small">a</span></span></button><div class="popover font-menu" id="font-menu" hidden><label for="font-size">字体大小 <output id="font-value">16 px</output></label><div class="font-stepper"><button data-action="font-smaller" aria-label="减小字体">−</button><input id="font-size" type="range" min="12" max="24" step="1" aria-label="文档字体大小"><button data-action="font-larger" aria-label="增大字体">+</button></div><p>调整文档显示字号，不改变 Markdown 内容。</p><button class="font-reset" data-action="reset-font">恢复默认字号</button></div></div>${button('outline', 'outline', '显示或隐藏文档大纲', 'outline-toggle active', 'aria-pressed="true"')}${button('focus', 'expand', '文档全屏', '', 'aria-pressed="false"')}</div></div>
+        <div class="format-toolbar">${button('sidebar', 'menu', '打开历史记录', 'mobile-menu')}<div class="toolbar-group">${button('undo', 'undo', '撤销 ⌘ Z')}${button('redo', 'redo', '重做 ⌘ ⇧ Z')}</div><span class="toolbar-separator"></span><div class="dropdown-wrap"><button class="heading-select" data-action="headings"><span id="format-label">正文</span>${icon('down', 12)}</button><div id="headings-menu" class="popover headings-menu" hidden><button data-heading="p">正文</button><button data-heading="h1">一级标题 <small>H1</small></button><button data-heading="h2">二级标题 <small>H2</small></button><button data-heading="h3">三级标题 <small>H3</small></button></div></div><span class="toolbar-separator"></span><div class="toolbar-group">${button('bold', 'bold', '加粗 ⌘ B')}${button('italic', 'italic', '斜体 ⌘ I')}${button('strike', 'strike', '删除线')}${button('inline-code', 'code', '行内代码')}${button('link', 'link', '插入链接 ⌘ K')}</div><span class="toolbar-separator"></span><div class="toolbar-group">${button('bullet', 'list', '无序列表')}${button('number', 'ordered', '有序列表')}${button('quote', 'quote', '引用')}${button('table', 'table', '插入表格')}</div><span class="toolbar-separator toolbar-last"></span><div class="dropdown-wrap"><button class="insert-button" data-action="insert">${icon('plus', 15)}<span>插入</span>${icon('down', 11)}</button><div id="insert-menu" class="popover insert-menu" hidden><button data-action="task">${icon('task', 16)}任务清单</button><button data-action="codeblock">${icon('code', 16)}代码块</button><button data-action="rule">${icon('rule', 16)}分割线</button><button data-action="table">${icon('table', 16)}表格</button><button data-action="image">${icon('file', 16)}图片链接</button></div></div><span class="toolbar-spacer" title="双击进入或退出文档全屏"></span><div class="view-options"><button class="width-button image-directory-button" data-action="image-directory" aria-label="授权图片目录" title="授权图片目录：选择 Markdown 所在文件夹（只读）" hidden>${icon('folder', 15)}<span>图片目录</span></button><div class="dropdown-wrap"><button class="width-button" data-action="width" aria-label="调整可视化宽度" aria-expanded="false">${icon('split', 15)}<span>宽度</span>${icon('down', 11)}</button><div class="popover width-menu" id="width-menu" hidden><label for="content-width">正文宽度 <output id="width-value">1080 px</output></label><input id="content-width" type="range" min="480" max="1400" step="20" aria-label="可视化正文宽度"><div class="width-presets"><button data-width="640">紧凑</button><button data-width="960">宽屏</button><button data-width="full">铺满</button></div><p>正文宽度受当前可视化区域限制。</p><button class="width-reset" data-action="reset-width">恢复默认宽度</button></div></div><button class="width-button mode-setting" data-action="display-mode" aria-label="切换显示模式"><span>切换显示模式</span></button><div class="dropdown-wrap"><button class="font-button" data-action="font-size" aria-label="调整文档字体大小" aria-expanded="false" title="调整文档字体大小"><span aria-hidden="true">A<span class="font-small">a</span></span></button><div class="popover font-menu" id="font-menu" hidden><label for="font-size">字体大小 <output id="font-value">16 px</output></label><div class="font-stepper"><button data-action="font-smaller" aria-label="减小字体">−</button><input id="font-size" type="range" min="12" max="24" step="1" aria-label="文档字体大小"><button data-action="font-larger" aria-label="增大字体">+</button></div><p>调整文档显示字号，不改变 Markdown 内容。</p><button class="font-reset" data-action="reset-font">恢复默认字号</button></div></div>${button('outline', 'outline', '显示或隐藏文档大纲', 'outline-toggle active', 'aria-pressed="true"')}${button('focus', 'expand', '文档全屏', '', 'aria-pressed="false"')}</div></div>
         <div class="editing-area" data-mode="visual">
           <section class="source-pane"><div class="pane-heading"><span><span class="pane-dot source-dot"></span>MARKDOWN<span class="pane-subtitle">源码编辑</span></span><span class="file-extension">.md</span></div><div class="source-content"><div class="line-numbers" aria-hidden="true"></div><textarea id="source-editor" aria-label="Markdown 源码" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea></div><div class="pane-footer"><span>UTF-8</span><span id="cursor-position">行 1，列 1</span></div></section>
           <section class="preview-pane"><div class="preview-scroll"><article id="visual-editor" class="prose" contenteditable="true" role="textbox" aria-label="可视化编辑内容" aria-multiline="true" spellcheck="false"></article></div></section>
@@ -112,7 +109,7 @@ $('#app').innerHTML = `
         </div>
         <div class="editor-status"><button class="status-sync" data-action="save-file" title="保存到原始文件 / 重新授权"><span class="status-dot"></span><span id="sync-status">尚未打开原文件</span></button><div class="status-shortcuts" aria-label="快捷键提示">${icon('keyboard', 13)}<span><kbd>⌘ B</kbd> 加粗</span><span class="status-divider"></span><span><kbd>⌘ I</kbd> 斜体</span><span class="status-divider"></span><span><kbd>⌘ S</kbd> 保存</span></div><div class="status-metrics"><span id="status-words">0 字</span><span class="status-divider"></span><span id="status-lines">0 行</span><span class="status-divider"></span><span>Markdown</span></div></div>
       </section>
-      <section class="empty-state" hidden><div>${icon('files', 36)}</div><h2>打开文档，继续你的思路</h2><p>选择本地 Markdown 文件，或从左侧历史记录中继续编辑。</p><button class="new-button" data-action="open">${icon('folder', 16)}打开文档</button></section>
+      <section class="empty-state" hidden>${button('sidebar', 'menu', '打开历史记录', 'mobile-menu empty-history-toggle')}<div>${icon('files', 36)}</div><h2>打开文档，继续你的思路</h2><p>选择本地 Markdown 文件，或从左侧历史记录中继续编辑。</p><button class="new-button" data-action="open">${icon('folder', 16)}打开文档</button></section>
     </main>
   </div>
   <div id="toast" class="toast" role="status" hidden></div>
@@ -129,6 +126,13 @@ const tableTools = installTableTools({
   begin: () => { historyForDoc(); lastEditKind = null; },
   commit: () => { changed('table-layout'); lastEditKind = null; },
   busy: value => { resizingTable = value; },
+});
+const outlineTracking = installOutlineTracking({
+  editor: visual,
+  scroll: $('.preview-scroll'),
+  list: $('#outline-list'),
+  pane: $('.outline-pane'),
+  enabled: () => mode === 'visual' && !!current(),
 });
 
 function applyFontSize() {
@@ -684,8 +688,9 @@ function updateOutline() {
   $('#outline-count').textContent = headings.length;
   $('#outline-list').innerHTML = headings.length ? headings.map((h, i) => {
     h.id = `heading-${i}`;
-    return `<button data-outline="${i}" class="outline-item ${i === 0 ? 'current' : ''}" style="--level:${Number(h.tagName[1]) - 1}"><span>${escapeHTML(h.textContent || '未命名标题')}</span></button>`;
+    return `<button data-outline="${i}" class="outline-item ${mode === 'source' && i === 0 ? 'current' : ''}" style="--level:${Number(h.tagName[1]) - 1}"><span>${escapeHTML(h.textContent || '未命名标题')}</span></button>`;
   }).join('') : '<p class="outline-empty">添加标题后<br>在这里快速导航</p>';
+  outlineTracking.refresh();
 }
 
 function setMode(value) {
@@ -746,23 +751,10 @@ function applyHistory(direction) {
 function updatePageTitle() {
   const name = current()?.title.trim();
   document.title = name ? (/\.(md|markdown|txt)$/i.test(name) ? name : name + (current().extension || '.md')) : '墨页 · Markdown 工作空间';
+  title.textContent = name || '';
+  title.title = current()?.sourcePath || document.title;
 }
 
-function updateDocumentPath() {
-  const doc = current();
-  const path = $('#document-path');
-  if (!doc) {
-    path.textContent = '尚未打开文档';
-    path.title = '';
-    return;
-  }
-  const name = doc.title.trim() || '未命名文档';
-  const filename = /\.(md|markdown|txt)$/i.test(name) ? name : name + (doc.extension || '.md');
-  path.textContent = doc.sourcePath || filename;
-  path.title = doc.localFilePath ? `文件绝对路径：${doc.localFilePath}` : doc.sourcePath?.includes('/')
-    ? `文件相对路径：${doc.sourcePath}`
-    : `${doc.sourcePath || filename}（浏览器未提供完整本地路径）`;
-}
 
 async function openCommandLineDocument() {
   const version = historyOpenVersion;
@@ -806,9 +798,8 @@ function loadDocument(id, readHistory = false) {
   const empty = !doc;
   $('.empty-state').hidden = !empty;
   ['.sidebar-document-info', '.editor-card'].forEach(s => { $(s).hidden = empty; });
-  $$('.top-actions button').forEach(button => { button.disabled = empty; });
   if (doc) {
-    title.value = doc.title;
+    title.textContent = doc.title;
     source.value = doc.markdown;
     visual.innerHTML = renderMarkdown(doc.markdown);
     source.scrollTop = 0;
@@ -816,7 +807,6 @@ function loadDocument(id, readHistory = false) {
     updateStats(); updateHistoryButtons();
   }
   updatePageTitle();
-  updateDocumentPath();
   updateFileEditability();
   renderFileSaveState();
   renderDocumentList(); save();
@@ -944,18 +934,6 @@ source.addEventListener('keydown', event => {
     changed('source');
   }
 });
-title.addEventListener('input', () => {
-  if (!current()) return;
-  current().title = title.value;
-  current().updated = Date.now();
-  updatePageTitle();
-  updateDocumentPath();
-  renderDocumentList(); save();
-});
-title.addEventListener('blur', () => {
-  if (current() && !title.value.trim()) { current().title = title.value = '未命名文档'; updatePageTitle(); updateDocumentPath(); renderDocumentList(); save(); }
-});
-
 document.addEventListener('selectionchange', () => {
   const selection = window.getSelection();
   if (!selection.rangeCount || !visual.contains(selection.anchorNode)) return;
@@ -1111,7 +1089,6 @@ const actions = {
   help: showHelp,
   undo: () => applyHistory(-1),
   redo: () => applyHistory(1),
-  more: () => togglePopover('#more-menu'),
   width: () => { togglePopover('#width-menu'); $('[data-action="width"]').setAttribute('aria-expanded', String(!$('#width-menu').hidden)); },
   'display-mode': () => setMode(mode === 'source' ? 'visual' : 'source'),
   'font-size': () => { togglePopover('#font-menu'); $('[data-action="font-size"]').setAttribute('aria-expanded', String(!$('#font-menu').hidden)); },
@@ -1121,7 +1098,6 @@ const actions = {
   'reset-width': () => { contentWidth = 1080; applyWidths(); save(); },
   headings: () => togglePopover('#headings-menu'),
   insert: () => togglePopover('#insert-menu'),
-  rename: () => { if (current()) { if (window.innerWidth <= 650) $('.sidebar').classList.add('mobile-open'); title.focus(); title.select(); } },
 
   'close-modal': () => $('#modal').close(),
   link: () => showLink(),
@@ -1162,7 +1138,7 @@ document.addEventListener('click', event => {
     if (['bold', 'italic', 'strike', 'inline-code', 'bullet', 'number', 'quote'].includes(action)) format(action);
     else if (['task', 'rule', 'codeblock', 'table'].includes(action)) insertBlock(action);
     else actions[action]?.();
-    if (!['more', 'headings', 'insert', 'width', 'reset-width', 'font-size', 'font-smaller', 'font-larger', 'reset-font'].includes(action)) closePopovers();
+    if (!['headings', 'insert', 'width', 'reset-width', 'font-size', 'font-smaller', 'font-larger', 'reset-font'].includes(action)) closePopovers();
   }
   if (documentButton) {
     const doc = documents.find(d => d.id === documentButton.dataset.document);
@@ -1180,9 +1156,13 @@ document.addEventListener('click', event => {
       source.scrollTop = source.value.slice(0, at).split('\n').length * fontSize * 1.85 - 80;
     } else {
       const heading = $(`#heading-${index}`);
-      if (heading) { $('.preview-scroll').scrollTo({ top: heading.offsetTop - visual.offsetTop - 20, behavior: 'smooth' }); heading.classList.remove('heading-flash'); void heading.offsetWidth; heading.classList.add('heading-flash'); }
+      if (heading) {
+        const scroll = $('.preview-scroll');
+        scroll.scrollTo({ top: scroll.scrollTop + heading.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 20, behavior: 'smooth' });
+        heading.classList.remove('heading-flash'); void heading.offsetWidth; heading.classList.add('heading-flash');
+      }
     }
-    $$('.outline-item').forEach(el => el.classList.toggle('current', el === outlineButton));
+    outlineTracking.select(index);
   }
 });
 

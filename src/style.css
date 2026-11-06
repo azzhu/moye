@@ -254,3 +254,14 @@ body .sidebar .document-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;
 /* Missing originals remain visible as history, with a clear status on the name. */
 .doc-row.file-missing .doc-select span{color:#c62828;text-decoration:line-through;text-decoration-color:currentColor}
 [data-theme=dark] .doc-row.file-missing .doc-select span{color:#ff8a80}
+
+/* Save state moves from the removed header into the sidebar footer. */
+.sidebar .sidebar-save-status{gap:7px;padding:6px 8px;min-height:40px;height:auto;white-space:normal}
+.sidebar .sidebar-save-status>.local-dot{display:block;margin:0;font-size:inherit}
+.sidebar .save-state{display:block;min-width:0;flex:1;padding:4px 0;text-align:left;font-size:10px;line-height:1.6;white-space:normal;overflow-wrap:anywhere;color:var(--subtle)}
+.sidebar .save-state.file-save-error{color:#b87553}
+.sidebar .save-state:hover:not(:disabled){color:var(--purple)}
+body .sidebar h2.document-title{margin:0;overflow-wrap:anywhere}
+.format-toolbar>.mobile-menu{flex-shrink:0;margin-left:0}
+.empty-state{position:relative}
+.empty-state>.empty-history-toggle{position:absolute;left:0;top:0}
