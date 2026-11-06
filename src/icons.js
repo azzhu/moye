@@ -32,6 +32,7 @@ const paths = {
   outline: '<path d="M8 5h13M8 12h13M8 19h8M3 5h.01M3 12h.01M3 19h.01"/>',
   expand: '<path d="M8 3H3v5M16 3h5v5M3 16v5h5m8 0h5v-5"/>',
   keyboard: '<rect x="2" y="5" width="20" height="14" rx="3"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"/>',
+  settings: '<path d="m9 3-.5 2.4-2 1.2-2.3-.8-2 3.4L4 11v2l-1.8 1.8 2 3.4 2.3-.8 2 1.2L9 21h6l.5-2.4 2-1.2 2.3.8 2-3.4L20 13v-2l1.8-1.8-2-3.4-2.3.8-2-1.2L15 3Z"/><circle cx="12" cy="12" r="3"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1 1m12 12 1 1M5 19l1-1M18 6l1-1"/>',
   moon: '<path d="M20.8 13A9 9 0 0 1 11 3a9 9 0 1 0 9.8 10Z"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 1 1 5 2c-2 1-2 2-2 3m0 3h.01"/>',

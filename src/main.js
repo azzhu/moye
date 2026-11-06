@@ -9,6 +9,7 @@ import { refreshLocalImages } from './local-images.js';
 import { DirectoryImageLoader, imageDirectoryKey, validateImageDirectory } from './directory-images.js';
 import { refreshCodeCopyButtons } from './code-copy.js';
 import { installOutlineTracking } from './outline-tracking.js';
+import { APPEARANCE_STORAGE_KEY, READING_STYLES, resolveReadingStyle, applyReadingStyle } from './appearance.js';
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const STORAGE_KEY = 'inkwell.workspace.v1';
@@ -34,6 +35,9 @@ try {
     if (saved.widthDefaultVersion !== 1080 && saved.contentWidth === 780) contentWidth = 1080;
   }
 } catch { storageAvailable = false; }
+let readingStyle = resolveReadingStyle(null, dark).id;
+try { readingStyle = resolveReadingStyle(localStorage.getItem(APPEARANCE_STORAGE_KEY), dark).id; }
+catch { /* Appearance still works when local storage is unavailable. */ }
 const current = () => documents.find(d => d.id === activeId);
 const histories = new Map();
 const fileHandles = new Map();
@@ -94,7 +98,7 @@ $('#app').innerHTML = `
     <div class="sidebar-bottom">
       <div class="sidebar-divider"></div>
       <button class="nav-item" data-action="help">${icon('help')}<span>使用指南</span><span class="external-arrow">↗</span></button>
-      <button class="nav-item" data-action="theme">${icon('sun')}<span id="theme-label">浅色模式</span><span class="theme-toggle"><i></i></span></button>
+      <button class="nav-item" data-action="settings">${icon('settings')}<span>设置</span><span class="settings-current" id="settings-current">默认</span></button>
       <div class="local-note sidebar-save-status"><span class="local-dot" aria-hidden="true"></span><button class="save-state" id="save-state" data-action="save-file" title="保存到原始文件 / 重新授权" aria-live="polite"></button></div>
     </div>
   </aside>
@@ -1035,12 +1039,31 @@ function togglePopover(id) {
 }
 
 function showModal(content, after) {
+  $('#modal').classList.remove('appearance-dialog');
   $('#modal-content').innerHTML = content;
   $('#modal').showModal();
   $('#modal-content').querySelector('[autofocus]')?.focus();
   after?.();
 }
 const modalHeader = (heading, sub = '') => `<div class="modal-heading"><div><h2>${heading}</h2>${sub ? `<p>${sub}</p>` : ''}</div>${button('close-modal', 'close', '关闭弹窗')}</div>`;
+
+function showSettings() {
+  showModal(`${modalHeader('设置', '选择适合你的阅读风格')}<div class="appearance-intro"><span>显示风格</span><span>点击即应用 · 自动记住</span></div><div class="appearance-grid" role="group" aria-label="网页显示风格">${READING_STYLES.map(style => `<button type="button" class="appearance-option" data-reading-style="${style.id}" aria-pressed="${style.id === readingStyle}" style="--sample-bg:${style.tokens.bg};--sample-paper:${style.tokens.paper};--sample-sidebar:${style.tokens.sidebar};--sample-accent:${style.tokens.purple};--sample-text:${style.tokens['reading-text']};--sample-line:${style.tokens.line};--sample-font:${style.tokens['reading-font'].replaceAll('"', '&quot;')};--sample-radius:${style.tokens['card-radius']}"><span class="appearance-preview" aria-hidden="true"><span class="sample-sidebar"><i></i><i></i><i></i></span><span class="sample-paper"><span class="sample-title">让阅读，慢下来</span><span class="sample-rule"></span><span class="sample-copy">字里行间，留住每一个想法。</span><span class="sample-lines"><i></i><i></i></span></span><span class="appearance-check">${icon('check', 13)}</span></span><span class="appearance-name">${style.name}<small>${style.badge}</small></span><span class="appearance-description">${style.description}</span></button>`).join('')}</div><p class="appearance-note">风格仅调整显示外观，保留文档字号、正文宽度和行距；不会改动 Markdown 文件。</p><div class="appearance-footer"><span id="appearance-feedback" role="status">当前风格：${resolveReadingStyle(readingStyle).name}</span><button class="primary-button" data-action="close-modal">完成</button></div>`);
+  $('#modal').classList.add('appearance-dialog');
+}
+
+function selectReadingStyle(id) {
+  readingStyle = resolveReadingStyle(id).id;
+  applyTheme();
+  let remembered = true;
+  try { localStorage.setItem(APPEARANCE_STORAGE_KEY, readingStyle); }
+  catch { remembered = false; }
+  for (const option of $$('[data-reading-style]')) {
+    option.setAttribute('aria-pressed', String(option.dataset.readingStyle === readingStyle));
+  }
+  const feedback = $('#appearance-feedback');
+  if (feedback) feedback.textContent = `已应用「${resolveReadingStyle(readingStyle).name}」${remembered ? '，已记住选择' : '；浏览器存储不可用，本次选择未记住'}`;
+}
 
 function showHelp() {
   showModal(`${modalHeader('给想法，一个舒适的空间', '墨页 · Markdown 工作空间')}<div class="help-intro">点击「宽度」右侧的「切换显示模式」按钮，在源码和可视化之间切换，全屏时也可使用。两种模式的内容实时同步。</div><div class="help-grid"><div>${icon('split', 22)}<h3>双向编辑</h3><p>在源码模式编写 Markdown，或在可视化模式直接修改文字、列表与表格。</p></div><div>${icon('folder', 22)}<h3>打开本地文档</h3><p>点击左侧「打开文档」，选择 .md、.markdown 或 .txt 文件。</p></div><div>${icon('files', 22)}<h3>历史记录</h3><p>自动保留最近打开或编辑的 20 篇文档。超出后自动移除最早的记录，授权后修改会自动写回原始文件，浏览器额外保存草稿。</p></div><div>${icon('keyboard', 22)}<h3>常用快捷键</h3><p>⌘ / Ctrl + B 加粗，I 斜体，S 保存，Z 撤销，Shift + Z 重做。</p></div></div><div class="help-notice">支持标题、粗体、斜体、删除线、链接、图片链接、列表、任务、引用、代码块与表格。支持 span 的 color 颜色与 font-weight 字重，以及 strong / b 加粗；其余 HTML 显示为文本。光标位于表格第一行时可调整整体宽度，拖动列间边界可调整列宽，Esc 取消拖动。文档包含本地相对路径图片时，可点击工具栏右侧「图片目录」，选择当前 Markdown 所在文件夹并授权只读访问。暂不支持数学公式与 Mermaid。请使用 Chrome 或 Edge 打开文件并允许读写。修改后停止输入约 0.45 秒会自动写回，写入成功后显示「已保存到原文件」。点击历史记录会重新读取原文件，需要时请求读写授权；读取失败会标明当前为旧草稿。<br>在可视化区域编辑后，Markdown 的空行、列表符号等格式可能会被统一整理。按住 ⌘ / Ctrl 点击文中链接可在新标签页打开。</div><button class="primary-button" data-action="close-modal">开始写作 ${icon('arrow', 16)}</button>`);
@@ -1115,14 +1138,18 @@ const actions = {
     $('[data-action="focus"]').title = focused ? '退出文档全屏（Esc）' : '文档全屏';
   },
   sidebar: () => $('.sidebar').classList.toggle('mobile-open'),
-  theme: () => { dark = !dark; applyTheme(); save(); },
+  settings: showSettings,
 };
 function applyTheme() {
-  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-  $('#theme-label').textContent = dark ? '深色模式' : '浅色模式';
+  const style = applyReadingStyle(document.documentElement, readingStyle);
+  dark = style.dark;
+  $('#settings-current').textContent = style.name;
+  outlineTracking.refresh();
 }
 
 document.addEventListener('click', event => {
+  const styleButton = event.target.closest('[data-reading-style]');
+  if (styleButton) { selectReadingStyle(styleButton.dataset.readingStyle); return; }
   const deleteButton = event.target.closest('[data-delete-history]');
   if (deleteButton) {
     if (!deleteButton.disabled) void deleteHistoryRecord(deleteButton.dataset.deleteHistory);
@@ -1168,7 +1195,7 @@ document.addEventListener('click', event => {
 
 document.addEventListener('keydown', event => {
   const mod = event.metaKey || event.ctrlKey;
-  if (event.key === 'Escape') { closePopovers(); $('.sidebar').classList.remove('mobile-open'); if (document.body.classList.contains('focus-mode')) actions.focus(); }
+  if (event.key === 'Escape' && !$('#modal').open) { closePopovers(); $('.sidebar').classList.remove('mobile-open'); if (document.body.classList.contains('focus-mode')) actions.focus(); }
   if (!mod) return;
   const key = event.key.toLowerCase();
   if ($('#modal').open) return;

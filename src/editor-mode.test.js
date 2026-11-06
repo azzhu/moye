@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { APPEARANCE_STORAGE_KEY, resolveReadingStyle } from './appearance.js';
 
 const main = await readFile(new URL('./main.js', import.meta.url), 'utf8');
 const functionSource = name => main.slice(main.indexOf(`function ${name}(`), main.indexOf('\n}\n', main.indexOf(`function ${name}(`)) + 3);
@@ -11,7 +12,7 @@ test('startup keeps source preferences and migrates old split settings to visual
   for (const [savedMode, expected] of [[undefined, 'visual'], ['split', 'visual'], ['source', 'source'], ['visual', 'visual'], ['unknown', 'visual']]) {
     const context = vm.createContext({
       localStorage: { getItem: () => savedMode === undefined ? null : JSON.stringify({ documents: [], mode: savedMode }) },
-      migrateHistory: documents => documents,
+      migrateHistory: documents => documents, APPEARANCE_STORAGE_KEY, resolveReadingStyle,
     });
     vm.runInContext(`${startup}\nglobalThis.restoredMode = mode;`, context);
     assert.equal(context.restoredMode, expected);
