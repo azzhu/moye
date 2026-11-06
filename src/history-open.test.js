@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
-import { OriginalFileWriter } from './file-access.js';
+import { OriginalFileWriter, hasUnsavedFileChanges, isMissingOriginalFile } from './file-access.js';
 
 const main = readFileSync(new URL('./main.js', import.meta.url), 'utf8');
 const functionSource = name => main.match(new RegExp(`(?:async )?function ${name}\\([^]*?\\n\\}`))[0];
@@ -24,7 +24,7 @@ function historyOpen({ dirty = false, disk = '磁盘最新内容', baseline = '�
     documents: [doc], activeId: null, openingHistoryId: null, historyOpenVersion: 0,
     deletingRecords: new Set(), fileHandles: new Map(missing ? [] : [['one', handle]]),
     fileWriters: new Map(), fileSaveStates: new Map(), fileSaveTimers: new Map([['one', 1]]),
-    handleRestore: Promise.resolve(), OriginalFileWriter, clearTimeout() {},
+    handleRestore: Promise.resolve(), OriginalFileWriter, hasUnsavedFileChanges, isMissingOriginalFile, setOriginalFileMissing(doc, missing) { doc.fileMissing = missing; }, clearTimeout() {},
     recallFileHandle: async () => null,
     updateFileEditability() {}, updateHistoryButtons() {}, renderFileSaveState() {}, save() {},
     toast(message) { calls.messages.push(message); },
@@ -76,6 +76,20 @@ test('missing handles, denied read access, and file errors explicitly mark the o
   }
 });
 
+test('opening a deleted file marks its history entry without deleting the cached content', async () => {
+  const setup = historyOpen();
+  setup.handle.getFile = async () => { throw Object.assign(new Error('文件不存在'), { name: 'NotFoundError' }); };
+  await setup.open('one');
+  assert.equal(setup.doc.fileMissing, true);
+  assert.equal(setup.doc.markdown, '旧内容');
+  assert.equal(setup.context.fileWriters.size, 0);
+  assert.equal(setup.calls.writes, 0);
+  setup.handle.getFile = async () => ({ size: 100, text: async () => '恢复后的文件' });
+  await setup.open('one');
+  assert.equal(setup.doc.fileMissing, false);
+  assert.equal(setup.doc.markdown, '恢复后的文件');
+});
+
 test('read access without write access still shows fresh disk content and a readonly status', async () => {
   const setup = historyOpen({ permission: 'denied' });
   await setup.open('one');
@@ -104,6 +118,27 @@ test('opening an unchanged original preserves unsaved drafts without writing aut
   assert.equal(setup.doc.fileDirty, true);
   assert.equal(setup.context.fileSaveStates.get('one').conflict, undefined);
   assert.match(setup.context.fileSaveStates.get('one').error, /未保存草稿/);
+  assert.equal(setup.calls.writes, 0);
+});
+
+test('reopening history ignores stale dirty flags when the cached text is still the saved baseline', async () => {
+  const setup = historyOpen({ dirty: true, disk: '外部编辑器的最新内容' });
+  setup.doc.markdown = '旧内容';
+  await setup.open('one');
+  assert.equal(setup.doc.markdown, '外部编辑器的最新内容');
+  assert.equal(setup.doc.fileDirty, false);
+  assert.equal(setup.context.fileWriters.get('one').diskContent, '外部编辑器的最新内容');
+  assert.equal(setup.context.fileSaveStates.has('one'), false);
+  assert.equal(setup.calls.writes, 0);
+});
+
+test('reopening a draft already saved by another page adopts the disk baseline without conflict', async () => {
+  const setup = historyOpen({ dirty: true, disk: '\uFEFF未保存草稿' });
+  await setup.open('one');
+  assert.equal(setup.doc.markdown, '未保存草稿');
+  assert.equal(setup.doc.fileDirty, false);
+  assert.equal(setup.context.fileWriters.get('one').diskContent, '\uFEFF未保存草稿');
+  assert.equal(setup.context.fileSaveStates.has('one'), false);
   assert.equal(setup.calls.writes, 0);
 });
 

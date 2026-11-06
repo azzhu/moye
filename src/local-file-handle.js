@@ -26,6 +26,7 @@ export class LocalFileHandle {
     const data = await response.json();
     if (!response.ok) {
       const error = new Error(data.error || '原文件读取或写入失败');
+      if (response.status === 404 && data.code === 'FILE_NOT_FOUND') error.code = 'FILE_NOT_FOUND';
       if (response.status === 409) { error.code = 'EXTERNAL_MODIFICATION'; error.externalContent = data.content; }
       throw error;
     }

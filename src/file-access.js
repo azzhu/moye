@@ -1,4 +1,12 @@
 import { LocalFileHandle } from './local-file-handle.js';
+
+export const isMissingOriginalFile = error => error?.name === 'NotFoundError' || error?.code === 'ENOENT' || error?.code === 'FILE_NOT_FOUND';
+
+export function hasUnsavedFileChanges(doc, baseline = doc.fileDiskContent) {
+  if (!doc.fileDirty) return false;
+  return typeof baseline !== 'string' || doc.markdown !== baseline.replace(/^\uFEFF/, '');
+}
+
 export class OriginalFileWriter {
   constructor(handle, diskContent) {
     this.handle = handle;

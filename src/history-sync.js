@@ -9,7 +9,15 @@ export function restorePageDrafts(storage, records) {
   const drafts = JSON.parse(storage.getItem(PAGE_DRAFT_STORAGE_KEY) || '[]');
   const combined = new Map(records.map(doc => [doc.id, doc]));
   if (Array.isArray(drafts)) {
-    for (const doc of drafts) if (validRecord(doc) && doc.fileDirty) combined.set(doc.id, doc);
+    for (const doc of drafts) {
+      if (!validRecord(doc) || !doc.fileDirty) continue;
+      const remote = combined.get(doc.id);
+      // A backup from before an acknowledged save is no longer an unsaved
+      // draft. Do not resurrect its dirty flag after reloading the page.
+      if (remote && !remote.fileDirty && remote.markdown === doc.markdown) continue;
+      if (typeof doc.fileDiskContent === 'string' && doc.markdown === doc.fileDiskContent.replace(/^\uFEFF/, '')) continue;
+      combined.set(doc.id, doc);
+    }
   }
   return [...combined.values()];
 }
@@ -40,6 +48,7 @@ export class SharedHistoryStore {
   constructor(storage) {
     this.storage = storage;
     this.baselines = new Map();
+    this.localDrafts = new Set();
     this.lastSignal = null;
     this.sequence = 0;
     this.client = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2);
@@ -49,6 +58,13 @@ export class SharedHistoryStore {
   isDeleted(id) { return this.storage.getItem(this.key('deleted', id)) !== null; }
   remember(doc) { this.baselines.set(doc.id, JSON.stringify(doc)); }
   hasLocalChanges(doc) { return this.baselines.get(doc.id) !== JSON.stringify(doc); }
+  ownsDraft(doc) {
+    if (this.localDrafts.has(doc.id)) return true;
+    const previous = this.baselines.get(doc.id);
+    if (!previous) return !!doc.fileDirty;
+    const baseline = JSON.parse(previous);
+    return !!doc.fileDirty && contentFields.some(key => JSON.stringify(doc[key]) !== JSON.stringify(baseline[key]));
+  }
   signal() {
     this.storage.setItem(this.key('changed'), `${this.client}:${++this.sequence}`);
   }
@@ -100,6 +116,8 @@ export class SharedHistoryStore {
     for (const local of localRecords) {
       if (!validRecord(local)) continue;
       const encoded = JSON.stringify(local);
+      if (this.ownsDraft(local)) this.localDrafts.add(local.id);
+      if (!local.fileDirty) this.localDrafts.delete(local.id);
       const previous = this.baselines.get(local.id);
       if (previous === encoded || this.isDeleted(local.id)) continue;
       const key = this.key('record', local.id);

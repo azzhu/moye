@@ -108,11 +108,9 @@ html,body{height:100%;overflow:hidden;overscroll-behavior:none}
 .font-button{display:flex;align-items:center;justify-content:center;width:30px;height:28px;border:1px solid var(--line);border-radius:5px;color:var(--subtle);background:var(--surface);font-size:15px;line-height:1}
 /* Display modes remain available in the document toolbar, including fullscreen. */
 .mode-setting{flex-shrink:0}
-.display-mode-menu{min-width:125px}
-.display-mode-menu button.selected{color:var(--purple);background:var(--purple-wash);font-weight:550}
 .font-small{font-size:11px;margin-left:1px}
 .font-button:hover,.font-button[aria-expanded=true]{color:var(--purple);border-color:#b9afe3}
-.format-toolbar .width-menu,.format-toolbar .font-menu,.format-toolbar .display-mode-menu{position:fixed;left:auto;bottom:auto;overflow-y:auto;overscroll-behavior:contain;z-index:90}
+.format-toolbar .width-menu,.format-toolbar .font-menu{position:fixed;left:auto;bottom:auto;overflow-y:auto;overscroll-behavior:contain;z-index:90}
 .font-menu{width:240px;padding:16px}
 .font-menu label{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--subtle);margin-bottom:12px}
 .font-menu output{font-size:10px;color:var(--purple);font-variant-numeric:tabular-nums}
@@ -192,6 +190,7 @@ body:not(.focus-mode) .editing-area .preview-scroll{padding-top:18px}
 :where(:root:not([data-theme=dark])) .prose code{color:#694982}
 :where(:root:not([data-theme=dark])) .prose pre code{color:#414658}
 :where(:root:not([data-theme=dark])) .prose li::marker{color:#686779}
+.prose ul>li:not(.task-item)::marker{font-size:1.2em;font-weight:700;color:var(--text)}
 [data-theme=dark] .prose th{color:#696879}
 
 /* Compact document spacing without reducing text size. */
@@ -248,3 +247,10 @@ body .sidebar .document-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;
 .prose pre:has(>.code-copy-button){position:relative;padding-right:42px}
 .code-copy-button{position:absolute;right:6px;top:6px;display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;border:1px solid var(--line);border-radius:5px;background:var(--surface);color:var(--subtle);user-select:none;line-height:1}
 .code-copy-button:hover{color:var(--purple);background:var(--purple-wash);border-color:#b9afe3}
+
+/* Images keep the browser's native copy/save context menu inside the editor. */
+.prose img{pointer-events:auto;-webkit-touch-callout:default;user-select:auto;-webkit-user-select:auto}
+
+/* Missing originals remain visible as history, with a clear status on the name. */
+.doc-row.file-missing .doc-select span{color:#c62828;text-decoration:line-through;text-decoration-color:currentColor}
+[data-theme=dark] .doc-row.file-missing .doc-select span{color:#ff8a80}

@@ -48,6 +48,22 @@ test('independent pages merge additions and stale refresh/unload snapshots canno
   assert.deepEqual(JSON.parse(storage.getItem('inkwell.workspace.v1')).documents, []);
 });
 
+test('missing-file status syncs and survives reload without altering saved Markdown or resurrecting history', () => {
+  const storage = new MemoryStorage();
+  const first = page(storage, [entry('one')]), second = page(storage);
+  first.context.documents[0].fileMissing = true; first.api.save(true);
+  second.api.syncSharedHistory();
+  assert.equal(second.view.history[0].fileMissing, true);
+  assert.equal(second.context.documents[0].markdown, '# one');
+  assert.equal(new SharedHistoryStore(storage).initialize([])[0].fileMissing, true);
+  second.context.documents[0].fileMissing = false; second.api.save(true);
+  first.api.syncSharedHistory();
+  assert.equal(first.view.history[0].fileMissing, false);
+  first.store.delete('one');
+  second.context.documents[0].fileMissing = true; second.api.save(true);
+  assert.equal(second.store.read().length, 0);
+});
+
 test('a deletion removes the sidebar entry everywhere while preserving another page’s live dirty editor', () => {
   const storage = new MemoryStorage();
   const first = page(storage, [entry('one')]), second = page(storage);
@@ -156,4 +172,44 @@ test('per-page draft backups survive a newer clean snapshot from another page', 
   const restored = restorePageDrafts(storage, [{ ...entry('one'), markdown: '其他页面已保存的内容', fileDirty: false }]);
   assert.equal(restored[0].markdown, '本页未写回草稿');
   assert.equal(restored[0].fileDirty, true);
+});
+
+test('a shared in-flight draft is not promoted into this page’s session backup and accepts a clean update', () => {
+  const storage = new MemoryStorage();
+  const first = page(storage, [{ ...entry('one'), markdown: '正在保存的内容', fileDirty: true, fileDiskContent: '原文' }]);
+  const second = page(storage);
+  second.api.save(true);
+  assert.deepEqual(JSON.parse(second.context.sessionStorage.getItem(PAGE_DRAFT_STORAGE_KEY)), []);
+  Object.assign(first.context.documents[0], { fileDirty: false, fileDiskContent: '正在保存的内容' });
+  first.api.save(true); second.api.syncSharedHistory();
+  assert.equal(second.context.documents[0].fileDirty, false);
+  assert.equal(second.context.documents[0].fileDiskContent, '正在保存的内容');
+});
+
+test('a clean shared snapshot never clears a live draft before the disk itself is checked', () => {
+  const storage = new MemoryStorage();
+  const first = page(storage, [entry('one')]), second = page(storage);
+  const active = second.context.documents[0];
+  second.context.activeId = 'one';
+  Object.assign(active, { markdown: '双方相同的内容', fileDirty: true }); second.api.save(true);
+  Object.assign(first.context.documents[0], { markdown: '双方相同的内容', fileDirty: false, fileDiskContent: '双方相同的内容' });
+  first.api.save(true); second.api.syncSharedHistory();
+  assert.equal(second.context.documents[0], active);
+  assert.equal(active.fileDirty, true);
+  assert.equal(second.store.localDrafts.has('one'), true);
+});
+
+test('session restoration discards already-saved or baseline-identical dirty snapshots and preserves distinct edits', () => {
+  const storage = new MemoryStorage();
+  const saved = { ...entry('saved'), markdown: '已保存内容', fileDiskContent: '已保存内容', fileDirty: false };
+  const external = { ...entry('external'), markdown: '磁盘新内容', fileDirty: false };
+  storage.setItem(PAGE_DRAFT_STORAGE_KEY, JSON.stringify([
+    { ...saved, fileDirty: true, fileDiskContent: '旧基线' },
+    { ...external, fileDirty: true, markdown: '原文', fileDiskContent: '\uFEFF原文' },
+    { ...entry('real-draft'), fileDirty: true, markdown: '实际未保存的修改', fileDiskContent: '原文' },
+  ]));
+  const restored = restorePageDrafts(storage, [saved, external]);
+  assert.equal(restored.find(doc => doc.id === 'saved'), saved);
+  assert.equal(restored.find(doc => doc.id === 'external'), external);
+  assert.equal(restored.find(doc => doc.id === 'real-draft').fileDirty, true);
 });

@@ -175,7 +175,7 @@ export function createLocalService({ root = MOYE_ROOT, secret, store = new Local
       response.end(request.method === 'HEAD' ? undefined : data);
     } catch (error) {
       const status = error.status || (error.code === 'ENOENT' ? 404 : error.code === 'EACCES' || error.code === 'EPERM' ? 403 : 500);
-      reply(response, status, { error: error.code === 'ENOENT' ? '原文件或页面不存在，请重新运行 moye 打开文件' : error.message, ...(typeof error.content === 'string' ? { content: error.content } : {}) });
+      reply(response, status, { error: error.code === 'ENOENT' ? '原文件或页面不存在，请重新运行 moye 打开文件' : error.message, ...(error.code === 'ENOENT' && request.url?.split('?')[0] === '/__moye/file' ? { code: 'FILE_NOT_FOUND' } : {}), ...(typeof error.content === 'string' ? { content: error.content } : {}) });
     }
   };
   const server = http.createServer(handler);

@@ -173,7 +173,7 @@ test('only text color is allowed through HTML spans', () => {
   }
   assert.equal(inline('<span style="color: expression(alert(1))">+1</span>'), '<span>+1</span>');
   assert.ok(!inline('<span style="color:red"><script>alert(1)</script></span>').includes('<script>'));
-  assert.equal(inline('![<span style="color:red">说明</span>](https://example.com/image.png)'), '<img src="https://example.com/image.png" alt="说明" loading="lazy" />');
+  assert.equal(inline('![<span style="color:red">说明</span>](https://example.com/image.png)'), '<img src="https://example.com/image.png" alt="说明" contenteditable="false" loading="lazy" />');
   assert.ok(!inline('[链接](https://example.com/<span style="color:red">x</span>)').includes('href='));
 });
 
@@ -202,6 +202,7 @@ test('relative images render as placeholders, supporting Chinese, subdirectories
     assert.ok(result.includes('<img data-image-path='), path);
     assert.ok(!result.includes(' src='), 'local files are resolved only after a command-line handle is connected');
     assert.ok(result.includes('data-image-alt="用户数与平均 RT、RPS 的关系"'));
+    assert.ok(result.includes('contenteditable="false"'), 'images retain native browser actions inside the visual editor');
   }
   const normal = '![说明](图片.png)';
   assert.ok(!renderMarkdown('`' + normal + '`').includes('<img'));

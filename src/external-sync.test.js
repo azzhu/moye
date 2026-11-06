@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
+import { hasUnsavedFileChanges, isMissingOriginalFile } from './file-access.js';
 
 const mainSource = readFileSync(new URL('./main.js', import.meta.url), 'utf8');
 const functionSource = name => mainSource.match(new RegExp(`(?:async )?function ${name}\\([^]*?\\n\\}`))[0];
@@ -19,10 +20,12 @@ function watcher({ dirty = false, disk = '外部内容', error, pending = false,
     composingDocument: false, resizingTable: false, openingHistoryId: null, deletingRecords: new Set(), externalChecks: new Set(),
     fileWriteCounts: new Map(), fileWriters: new Map([[doc.id, writer]]),
     fileSaveStates: new Map(), fileSaveTimers: new Map(pending ? [[doc.id, 1]] : []),
+    hasUnsavedFileChanges, isMissingOriginalFile, setOriginalFileMissing(doc, missing) { doc.fileMissing = missing; },
     clearTimeout() { calls.cleared++; }, renderFileSaveState() { calls.rendered++; }, save() {},
     toast(message) { calls.messages.push(message); },
     applyExternalContent(target, targetWriter, content) {
-      calls.refreshed++; target.markdown = content; targetWriter.diskContent = content;
+      calls.refreshed++; target.markdown = content; target.fileDirty = false; target.fileDiskContent = content; targetWriter.diskContent = content;
+      context.fileSaveStates.delete(target.id);
     },
   };
   const check = runInNewContext(functionSource('checkExternalModification') + '\ncheckExternalModification', context);
@@ -37,6 +40,29 @@ test('clean documents automatically refresh when external contents change', asyn
   await setup.check();
   assert.equal(setup.calls.refreshed, 1);
   assert.equal(setup.calls.messages.length, 1);
+});
+
+test('a stale dirty flag or reverted edit does not prevent external refresh, even after a conflict', async () => {
+  const setup = watcher({ dirty: true, pending: true });
+  setup.doc.markdown = '原始内容';
+  setup.context.fileSaveStates.set('one', { conflict: true, external: '之前的磁盘版本' });
+  await setup.check();
+  assert.equal(setup.doc.markdown, '外部内容');
+  assert.equal(setup.doc.fileDirty, false);
+  assert.equal(setup.context.fileSaveStates.has('one'), false);
+  assert.equal(setup.context.fileSaveTimers.size, 0);
+  assert.equal(setup.writer.diskContent, '外部内容');
+});
+
+test('a draft matching the current disk is acknowledged as saved instead of treated as an external conflict', async () => {
+  const setup = watcher({ dirty: true, disk: '\uFEFF网页内容' });
+  setup.context.fileSaveStates.set('one', { conflict: true, external: '旧磁盘版本' });
+  await setup.check();
+  assert.equal(setup.doc.markdown, '\uFEFF网页内容');
+  assert.equal(setup.doc.fileDirty, false);
+  assert.equal(setup.context.fileSaveStates.has('one'), false);
+  await setup.check();
+  assert.equal(setup.calls.refreshed, 1);
 });
 
 test('unsaved browser edits are preserved and the scheduled save is cancelled on conflict', async () => {

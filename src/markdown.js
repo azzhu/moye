@@ -54,8 +54,8 @@ export function inline(source) {
     const url = (angled ?? plain).replace(/&(amp|quot|#39|lt|gt);/g, (_, entity) => ({ amp: '&', quot: '"', '#39': "'", lt: '<', gt: '>' }[entity]));
     const valid = url.includes('\u0000') ? '' : safeURL(url);
     const plainAlt = restore(alt).replace(/<[^>]*>/g, '');
-    if (valid && /^https?:/i.test(valid)) return stash(`<img src="${escapeHTML(valid)}" alt="${plainAlt}" loading="lazy" />`);
-    if (relativeImagePath(url)) return stash(`<img data-image-path="${escapeHTML(url)}" data-image-alt="${plainAlt}" alt="${plainAlt}" loading="lazy" />`);
+    if (valid && /^https?:/i.test(valid)) return stash(`<img src="${escapeHTML(valid)}" alt="${plainAlt}" contenteditable="false" loading="lazy" />`);
+    if (relativeImagePath(url)) return stash(`<img data-image-path="${escapeHTML(url)}" data-image-alt="${plainAlt}" alt="${plainAlt}" contenteditable="false" loading="lazy" />`);
     return stash(plainAlt);
   });
   text = text.replace(/\[([^\]]+)\]\(([^\s)]+)\)/g, (_, label, url) => {

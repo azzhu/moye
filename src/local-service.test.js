@@ -106,6 +106,15 @@ test('local handles can be persisted and restored, and startup only accepts a we
   await assert.rejects(handle.getFile(), /重新运行 moye/);
 });
 
+test('local file service distinguishes a deleted original from an unrelated 404', async () => localFixture(async ({ path, store, request }) => {
+  const descriptor = await store.register(path);
+  await rm(path);
+  const handle = new LocalFileHandle(descriptor, request);
+  await assert.rejects(handle.getFile(), error => error.code === 'FILE_NOT_FOUND');
+  const unrelated = new LocalFileHandle(descriptor, async () => ({ ok: false, status: 404, json: async () => ({ error: '接口不存在' }) }));
+  await assert.rejects(unrelated.getFile(), error => error.code === undefined);
+}));
+
 const examplePNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aTcQAAAAASUVORK5CYII=', 'base64');
 
 test('image endpoint returns exact image bytes for same-directory and nested Unicode filenames', async () => localFixture(async ({ path, directory, store, request }) => {

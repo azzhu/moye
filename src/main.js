@@ -2,7 +2,7 @@ import { renderMarkdown, serializeMarkdown, escapeHTML, safeURL } from './markdo
 import { icon } from './icons.js';
 import { HISTORY_LIMIT, recentDocuments, migrateHistory } from './history.js';
 import { SharedHistoryStore, HISTORY_STORAGE_PREFIX, PAGE_DRAFT_STORAGE_KEY, restorePageDrafts } from './history-sync.js';
-import { OriginalFileWriter, rememberFileHandle, recallFileHandle, forgetFileHandle } from './file-access.js';
+import { OriginalFileWriter, hasUnsavedFileChanges, isMissingOriginalFile, rememberFileHandle, recallFileHandle, forgetFileHandle } from './file-access.js';
 import { installTableTools } from './table-tools.js';
 import { localFileFromHash } from './local-file-handle.js';
 import { refreshLocalImages } from './local-images.js';
@@ -58,8 +58,12 @@ try {
   sharedHistoryRecords = documents;
 } catch { storageAvailable = false; }
 try {
+  const sharedRecords = new Set(documents);
   documents = restorePageDrafts(sessionStorage, documents);
-  documents.filter(doc => doc.fileDirty).forEach(doc => historyStore?.remember(doc));
+  documents.filter(doc => doc.fileDirty && !sharedRecords.has(doc)).forEach(doc => {
+    historyStore?.localDrafts.add(doc.id);
+    historyStore?.remember(doc);
+  });
 } catch { /* Shared history and original-file saving still work without session storage. */ }
 // Restore in advance so opening the picker still occurs directly in the click gesture.
 recallFileHandle(LAST_OPENED_HANDLE_KEY).then(handle => { lastOpenedHandle ||= handle; }).catch(() => {});
@@ -100,7 +104,7 @@ $('#app').innerHTML = `
     </header>
     <main class="workspace">
       <section class="editor-card" aria-label="Markdown 编辑器">
-        <div class="format-toolbar"><div class="toolbar-group">${button('undo', 'undo', '撤销 ⌘ Z')}${button('redo', 'redo', '重做 ⌘ ⇧ Z')}</div><span class="toolbar-separator"></span><div class="dropdown-wrap"><button class="heading-select" data-action="headings"><span id="format-label">正文</span>${icon('down', 12)}</button><div id="headings-menu" class="popover headings-menu" hidden><button data-heading="p">正文</button><button data-heading="h1">一级标题 <small>H1</small></button><button data-heading="h2">二级标题 <small>H2</small></button><button data-heading="h3">三级标题 <small>H3</small></button></div></div><span class="toolbar-separator"></span><div class="toolbar-group">${button('bold', 'bold', '加粗 ⌘ B')}${button('italic', 'italic', '斜体 ⌘ I')}${button('strike', 'strike', '删除线')}${button('inline-code', 'code', '行内代码')}${button('link', 'link', '插入链接 ⌘ K')}</div><span class="toolbar-separator"></span><div class="toolbar-group">${button('bullet', 'list', '无序列表')}${button('number', 'ordered', '有序列表')}${button('quote', 'quote', '引用')}${button('table', 'table', '插入表格')}</div><span class="toolbar-separator toolbar-last"></span><div class="dropdown-wrap"><button class="insert-button" data-action="insert">${icon('plus', 15)}<span>插入</span>${icon('down', 11)}</button><div id="insert-menu" class="popover insert-menu" hidden><button data-action="task">${icon('task', 16)}任务清单</button><button data-action="codeblock">${icon('code', 16)}代码块</button><button data-action="rule">${icon('rule', 16)}分割线</button><button data-action="table">${icon('table', 16)}表格</button><button data-action="image">${icon('file', 16)}图片链接</button></div></div><span class="toolbar-spacer" title="双击进入或退出文档全屏"></span><div class="view-options"><button class="width-button image-directory-button" data-action="image-directory" aria-label="授权图片目录" title="授权图片目录：选择 Markdown 所在文件夹（只读）" hidden>${icon('folder', 15)}<span>图片目录</span></button><div class="dropdown-wrap"><button class="width-button" data-action="width" aria-label="调整可视化宽度" aria-expanded="false">${icon('split', 15)}<span>宽度</span>${icon('down', 11)}</button><div class="popover width-menu" id="width-menu" hidden><label for="content-width">正文宽度 <output id="width-value">1080 px</output></label><input id="content-width" type="range" min="480" max="1400" step="20" aria-label="可视化正文宽度"><div class="width-presets"><button data-width="640">紧凑</button><button data-width="960">宽屏</button><button data-width="full">铺满</button></div><p>正文宽度受当前可视化区域限制。</p><button class="width-reset" data-action="reset-width">恢复默认宽度</button></div></div><div class="dropdown-wrap mode-setting"><button class="width-button" data-action="display-mode" aria-label="显示模式" aria-controls="display-mode-menu" aria-expanded="false"><span>显示模式</span>${icon('down', 11)}</button><div class="popover display-mode-menu" id="display-mode-menu" role="group" aria-label="显示模式" hidden><button data-display-mode="source" aria-pressed="false">${icon('code', 15)}源码</button><button data-display-mode="visual" aria-pressed="true">${icon('eye', 15)}可视化</button></div></div><div class="dropdown-wrap"><button class="font-button" data-action="font-size" aria-label="调整文档字体大小" aria-expanded="false" title="调整文档字体大小"><span aria-hidden="true">A<span class="font-small">a</span></span></button><div class="popover font-menu" id="font-menu" hidden><label for="font-size">字体大小 <output id="font-value">16 px</output></label><div class="font-stepper"><button data-action="font-smaller" aria-label="减小字体">−</button><input id="font-size" type="range" min="12" max="24" step="1" aria-label="文档字体大小"><button data-action="font-larger" aria-label="增大字体">+</button></div><p>调整文档显示字号，不改变 Markdown 内容。</p><button class="font-reset" data-action="reset-font">恢复默认字号</button></div></div>${button('outline', 'outline', '显示或隐藏文档大纲', 'outline-toggle active', 'aria-pressed="true"')}${button('focus', 'expand', '文档全屏', '', 'aria-pressed="false"')}</div></div>
+        <div class="format-toolbar"><div class="toolbar-group">${button('undo', 'undo', '撤销 ⌘ Z')}${button('redo', 'redo', '重做 ⌘ ⇧ Z')}</div><span class="toolbar-separator"></span><div class="dropdown-wrap"><button class="heading-select" data-action="headings"><span id="format-label">正文</span>${icon('down', 12)}</button><div id="headings-menu" class="popover headings-menu" hidden><button data-heading="p">正文</button><button data-heading="h1">一级标题 <small>H1</small></button><button data-heading="h2">二级标题 <small>H2</small></button><button data-heading="h3">三级标题 <small>H3</small></button></div></div><span class="toolbar-separator"></span><div class="toolbar-group">${button('bold', 'bold', '加粗 ⌘ B')}${button('italic', 'italic', '斜体 ⌘ I')}${button('strike', 'strike', '删除线')}${button('inline-code', 'code', '行内代码')}${button('link', 'link', '插入链接 ⌘ K')}</div><span class="toolbar-separator"></span><div class="toolbar-group">${button('bullet', 'list', '无序列表')}${button('number', 'ordered', '有序列表')}${button('quote', 'quote', '引用')}${button('table', 'table', '插入表格')}</div><span class="toolbar-separator toolbar-last"></span><div class="dropdown-wrap"><button class="insert-button" data-action="insert">${icon('plus', 15)}<span>插入</span>${icon('down', 11)}</button><div id="insert-menu" class="popover insert-menu" hidden><button data-action="task">${icon('task', 16)}任务清单</button><button data-action="codeblock">${icon('code', 16)}代码块</button><button data-action="rule">${icon('rule', 16)}分割线</button><button data-action="table">${icon('table', 16)}表格</button><button data-action="image">${icon('file', 16)}图片链接</button></div></div><span class="toolbar-spacer" title="双击进入或退出文档全屏"></span><div class="view-options"><button class="width-button image-directory-button" data-action="image-directory" aria-label="授权图片目录" title="授权图片目录：选择 Markdown 所在文件夹（只读）" hidden>${icon('folder', 15)}<span>图片目录</span></button><div class="dropdown-wrap"><button class="width-button" data-action="width" aria-label="调整可视化宽度" aria-expanded="false">${icon('split', 15)}<span>宽度</span>${icon('down', 11)}</button><div class="popover width-menu" id="width-menu" hidden><label for="content-width">正文宽度 <output id="width-value">1080 px</output></label><input id="content-width" type="range" min="480" max="1400" step="20" aria-label="可视化正文宽度"><div class="width-presets"><button data-width="640">紧凑</button><button data-width="960">宽屏</button><button data-width="full">铺满</button></div><p>正文宽度受当前可视化区域限制。</p><button class="width-reset" data-action="reset-width">恢复默认宽度</button></div></div><button class="width-button mode-setting" data-action="display-mode" aria-label="切换显示模式"><span>切换显示模式</span></button><div class="dropdown-wrap"><button class="font-button" data-action="font-size" aria-label="调整文档字体大小" aria-expanded="false" title="调整文档字体大小"><span aria-hidden="true">A<span class="font-small">a</span></span></button><div class="popover font-menu" id="font-menu" hidden><label for="font-size">字体大小 <output id="font-value">16 px</output></label><div class="font-stepper"><button data-action="font-smaller" aria-label="减小字体">−</button><input id="font-size" type="range" min="12" max="24" step="1" aria-label="文档字体大小"><button data-action="font-larger" aria-label="增大字体">+</button></div><p>调整文档显示字号，不改变 Markdown 内容。</p><button class="font-reset" data-action="reset-font">恢复默认字号</button></div></div>${button('outline', 'outline', '显示或隐藏文档大纲', 'outline-toggle active', 'aria-pressed="true"')}${button('focus', 'expand', '文档全屏', '', 'aria-pressed="false"')}</div></div>
         <div class="editing-area" data-mode="visual">
           <section class="source-pane"><div class="pane-heading"><span><span class="pane-dot source-dot"></span>MARKDOWN<span class="pane-subtitle">源码编辑</span></span><span class="file-extension">.md</span></div><div class="source-content"><div class="line-numbers" aria-hidden="true"></div><textarea id="source-editor" aria-label="Markdown 源码" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea></div><div class="pane-footer"><span>UTF-8</span><span id="cursor-position">行 1，列 1</span></div></section>
           <section class="preview-pane"><div class="preview-scroll"><article id="visual-editor" class="prose" contenteditable="true" role="textbox" aria-label="可视化编辑内容" aria-multiline="true" spellcheck="false"></article></div></section>
@@ -171,7 +175,8 @@ function save(immediate = false) {
   const perform = () => {
     // A different page's clean disk snapshot must never erase this page's
     // unsaved draft backup when the user refreshes it.
-    try { sessionStorage.setItem(PAGE_DRAFT_STORAGE_KEY, JSON.stringify(documents.filter(doc => doc.fileDirty || fileWriteCounts.get(doc.id)))); }
+    try { sessionStorage.setItem(PAGE_DRAFT_STORAGE_KEY, JSON.stringify(documents.filter(doc =>
+      (doc.fileDirty && (!historyStore || historyStore.ownsDraft(doc))) || fileWriteCounts.get(doc.id)))); }
     catch { /* The existing beforeunload check still protects unsaved edits. */ }
     try {
       if (historyStore) applySharedHistory(historyStore.publish(documents));
@@ -185,7 +190,7 @@ function save(immediate = false) {
 
 function applySharedHistory(records) {
   const local = new Map(documents.map(doc => [doc.id, doc]));
-  const protectedRecord = doc => doc.id === activeId || doc.fileDirty || fileWriteCounts.get(doc.id)
+  const protectedRecord = doc => doc.id === activeId || (doc.fileDirty && historyStore.ownsDraft(doc)) || fileWriteCounts.get(doc.id)
     || openingHistoryId === doc.id || authorizingImageDirectories.has(doc.id) || historyStore.hasLocalChanges(doc);
   sharedHistoryRecords = records;
   documents = records.map(record => {
@@ -353,6 +358,7 @@ async function flushOriginalFile(doc) {
     return true;
   } catch (error) {
     doc.fileDirty = true;
+    if (isMissingOriginalFile(error)) setOriginalFileMissing(doc, true);
     if (error.code === 'EXTERNAL_MODIFICATION') {
       clearTimeout(fileSaveTimers.get(doc.id)); fileSaveTimers.delete(doc.id);
       fileSaveStates.set(doc.id, { conflict: true, external: error.externalContent });
@@ -380,6 +386,7 @@ async function authorizeOriginalFile() {
     if (await handle.requestPermission({ mode: 'readwrite' }) !== 'granted') throw new Error('未获得读写授权，原文件不会被修改');
     if (!fileWriters.has(doc.id)) {
       const disk = await (await handle.getFile()).text();
+      if (!hasUnsavedFileChanges(doc) || doc.markdown === disk.replace(/^\uFEFF/, '')) doc.fileDirty = false;
       if (doc.fileDirty && doc.fileDiskContent !== disk) throw new Error('原文件已改变，无法自动合并草稿；请先复制草稿，再重新打开原文件');
       if (!doc.fileDirty) {
         doc.markdown = disk.replace(/^\uFEFF/, '');
@@ -453,11 +460,20 @@ async function checkExternalModification() {
   try {
     const external = await writer.inspectExternal();
     if (activeId !== doc.id || !documents.includes(doc) || fileWriters.get(doc.id) !== writer || fileWriteCounts.get(doc.id) || writer.diskContent !== baseline || composingDocument || resizingTable || deletingRecords.has(doc.id) || openingHistoryId === doc.id) return;
+    setOriginalFileMissing(doc, false);
+    const unsaved = hasUnsavedFileChanges(doc, baseline);
+    const matchesDisk = doc.markdown === external.content.replace(/^\uFEFF/, '');
+    if ((!unsaved || matchesDisk) && (external.content !== baseline || doc.fileDirty || fileSaveStates.get(doc.id)?.conflict)) {
+      clearTimeout(fileSaveTimers.get(doc.id)); fileSaveTimers.delete(doc.id);
+      applyExternalContent(doc, writer, external.content, external.modified);
+      if (external.content !== baseline) toast('原文件有外部修改，已自动刷新');
+      return;
+    }
     if (external.content === baseline) {
       if (fileSaveStates.get(doc.id)?.watchError) { fileSaveStates.delete(doc.id); renderFileSaveState(); }
       return;
     }
-    if (doc.fileDirty || fileSaveTimers.has(doc.id)) {
+    if (unsaved) {
       const first = !fileSaveStates.get(doc.id)?.conflict;
       clearTimeout(fileSaveTimers.get(doc.id)); fileSaveTimers.delete(doc.id);
       fileSaveStates.set(doc.id, { conflict: true, external: external.content });
@@ -468,6 +484,7 @@ async function checkExternalModification() {
     applyExternalContent(doc, writer, external.content, external.modified);
     toast('原文件有外部修改，已自动刷新');
   } catch (error) {
+    if (activeId === doc.id && fileWriters.get(doc.id) === writer && isMissingOriginalFile(error)) setOriginalFileMissing(doc, true);
     if (activeId === doc.id && fileWriters.get(doc.id) === writer && !fileSaveStates.get(doc.id)?.conflict) {
       fileSaveStates.set(doc.id, { error: error.message || '暂时无法读取原文件，已保留当前显示内容', watchError: true });
       renderFileSaveState();
@@ -532,6 +549,8 @@ async function openOriginalFile() {
       doc = { id: crypto.randomUUID(), title: file.name.replace(/\.(md|markdown|txt)$/i, ''), extension: file.name.match(/\.(md|markdown|txt)$/i)?.[0] || '.md', sourcePath: file.name, markdown: clean, updated: Date.now() };
       documents.unshift(doc);
     }
+    doc.fileMissing = false;
+    if (!hasUnsavedFileChanges(doc) || doc.markdown === disk.replace(/^\uFEFF/, '')) doc.fileDirty = false;
     if (!doc.fileDirty) { doc.markdown = disk.replace(/^\uFEFF/, ''); histories.delete(doc.id); }
     const baseline = doc.fileDirty ? doc.fileDiskContent : disk;
     fileHandles.set(doc.id, handle);
@@ -558,10 +577,43 @@ function relativeTime(time) {
   return `${Math.floor(minutes / 1440)} 天前`;
 }
 
+function setOriginalFileMissing(doc, missing) {
+  if (!documents.includes(doc) || !!doc.fileMissing === missing) return;
+  doc.fileMissing = missing;
+  save(true);
+  renderDocumentList();
+}
+
+let checkingHistoryAvailability = false;
+async function checkHistoryFileAvailability() {
+  if (document.hidden || checkingHistoryAvailability) return;
+  checkingHistoryAvailability = true;
+  try {
+    await handleRestore;
+    for (const id of documents.map(doc => doc.id)) {
+      if (document.hidden) break;
+      const doc = documents.find(doc => doc.id === id);
+      if (!doc) continue;
+      const handle = fileHandles.get(doc.id);
+      // Native getFile checks existence without reading the Markdown body.
+      // Never prompt for permission as part of a background history check.
+      if (!handle || handle.type === 'moye-local-file' || deletingRecords.has(doc.id) || fileWriteCounts.get(doc.id)) continue;
+      const valid = () => documents.includes(doc) && fileHandles.get(doc.id) === handle && !deletingRecords.has(doc.id) && !fileWriteCounts.get(doc.id);
+      try {
+        if (await handle.queryPermission({ mode: 'read' }) !== 'granted' || !valid()) continue;
+        await handle.getFile();
+        if (valid()) setOriginalFileMissing(doc, false);
+      } catch (error) {
+        if (valid() && isMissingOriginalFile(error)) setOriginalFileMissing(doc, true);
+      }
+    }
+  } finally { checkingHistoryAvailability = false; }
+}
+
 function renderDocumentList() {
   const records = sharedHistoryRecords || documents;
   $('#history-count').textContent = `${records.length} / ${HISTORY_LIMIT}`;
-  $('#document-list').innerHTML = records.length ? records.map(doc => `<div class="doc-row ${doc.id === activeId ? 'selected' : ''}"><button class="doc-select" data-document="${escapeHTML(doc.id)}" title="${escapeHTML(doc.title || '未命名文档')}">${icon('file', 16)}<span>${escapeHTML(doc.title || '未命名文档')}</span></button><button class="icon-button history-delete" data-delete-history="${escapeHTML(doc.id)}" aria-label="删除历史记录：${escapeHTML(doc.title || '未命名文档')}" title="删除历史记录，不删除原文件" ${deletingRecords.has(doc.id) ? 'disabled' : ''}>${icon('trash', 14)}</button></div>`).join('') : '<p class="list-empty">暂无历史记录<br>打开文档后自动保留，最多 20 条。</p>';
+  $('#document-list').innerHTML = records.length ? records.map(doc => `<div class="doc-row ${doc.id === activeId ? 'selected' : ''} ${doc.fileMissing ? 'file-missing' : ''}"><button class="doc-select" data-document="${escapeHTML(doc.id)}" title="${escapeHTML((doc.title || '未命名文档') + (doc.fileMissing ? '（原文件不存在，可能已删除或移动）' : ''))}">${icon('file', 16)}<span>${escapeHTML(doc.title || '未命名文档')}</span></button><button class="icon-button history-delete" data-delete-history="${escapeHTML(doc.id)}" aria-label="删除历史记录：${escapeHTML(doc.title || '未命名文档')}" title="删除历史记录，不删除原文件" ${deletingRecords.has(doc.id) ? 'disabled' : ''}>${icon('trash', 14)}</button></div>`).join('') : '<p class="list-empty">暂无历史记录<br>打开文档后自动保留，最多 20 条。</p>';
 }
 
 async function deleteHistoryRecord(id) {
@@ -640,12 +692,7 @@ function setMode(value) {
   tableTools.reset();
   mode = value === 'source' ? 'source' : 'visual';
   $('.editing-area').dataset.mode = mode;
-  $$('[data-display-mode]').forEach(button => {
-    const selected = button.dataset.displayMode === mode;
-    button.classList.toggle('selected', selected);
-    button.setAttribute('aria-pressed', String(selected));
-  });
-  $('[data-action="display-mode"]').title = `显示模式：${mode === 'source' ? '源码' : '可视化'}`;
+  $('[data-action="display-mode"]').title = `当前：${mode === 'source' ? '源码' : '可视化'}；点击切换为${mode === 'source' ? '可视化' : '源码'}`;
   save();
 }
 
@@ -815,13 +862,15 @@ async function openHistoryDocument(id) {
     if (file.size > 2 * 1024 * 1024) throw new Error('原文件超过 2 MB，未刷新；当前保留历史草稿');
     const disk = await file.text();
     if (!stillCurrent()) return;
+    setOriginalFileMissing(doc, false);
     clearTimeout(fileSaveTimers.get(id)); fileSaveTimers.delete(id);
     const baseline = doc.fileDiskContent ?? previousWriter?.diskContent;
-    const writer = new OriginalFileWriter(handle, doc.fileDirty ? baseline ?? disk : disk);
+    const unsaved = hasUnsavedFileChanges(doc, baseline) && doc.markdown !== disk.replace(/^\uFEFF/, '');
+    const writer = new OriginalFileWriter(handle, unsaved ? baseline ?? disk : disk);
     if (permission === 'granted') fileWriters.set(id, writer);
     else fileWriters.delete(id);
     openingHistoryId = null;
-    if (doc.fileDirty) {
+    if (unsaved) {
       // Read from disk, but never discard or silently write a restored draft.
       if (baseline === undefined || disk !== baseline) {
         fileSaveStates.set(id, { conflict: true, external: disk, historyReadOnly: permission !== 'granted' });
@@ -836,6 +885,7 @@ async function openHistoryDocument(id) {
     updateFileEditability(); updateHistoryButtons(); renderFileSaveState(); save(true);
   } catch (error) {
     if (!stillCurrent()) return;
+    if (isMissingOriginalFile(error)) setOriginalFileMissing(doc, true);
     openingHistoryId = null;
     fileWriters.delete(id);
     fileSaveStates.set(id, { historyReadError: true, error: error.message || '原文件读取失败，当前显示的是历史草稿；请重新打开原文件' });
@@ -990,14 +1040,14 @@ function format(action, value) {
 
 function closePopovers() {
   $$('.popover').forEach(p => { p.hidden = true; });
-  for (const action of ['width', 'font-size', 'display-mode']) $(`[data-action="${action}"]`).setAttribute('aria-expanded', 'false');
+  for (const action of ['width', 'font-size']) $(`[data-action="${action}"]`).setAttribute('aria-expanded', 'false');
 }
 function togglePopover(id) {
   const wasHidden = $(id).hidden;
   closePopovers();
   const menu = $(id);
   menu.hidden = !wasHidden;
-  if (wasHidden && ['#width-menu', '#font-menu', '#display-mode-menu'].includes(id)) {
+  if (wasHidden && ['#width-menu', '#font-menu'].includes(id)) {
     const trigger = menu.parentElement.querySelector('button');
     const rect = trigger.getBoundingClientRect();
     menu.style.top = `${rect.bottom + 8}px`;
@@ -1015,7 +1065,7 @@ function showModal(content, after) {
 const modalHeader = (heading, sub = '') => `<div class="modal-heading"><div><h2>${heading}</h2>${sub ? `<p>${sub}</p>` : ''}</div>${button('close-modal', 'close', '关闭弹窗')}</div>`;
 
 function showHelp() {
-  showModal(`${modalHeader('给想法，一个舒适的空间', '墨页 · Markdown 工作空间')}<div class="help-intro">通过「宽度」右侧的「显示模式」切换源码或可视化，全屏时也可切换。两种模式的内容实时同步。</div><div class="help-grid"><div>${icon('split', 22)}<h3>双向编辑</h3><p>在源码模式编写 Markdown，或在可视化模式直接修改文字、列表与表格。</p></div><div>${icon('folder', 22)}<h3>打开本地文档</h3><p>点击左侧「打开文档」，选择 .md、.markdown 或 .txt 文件。</p></div><div>${icon('files', 22)}<h3>历史记录</h3><p>自动保留最近打开或编辑的 20 篇文档。超出后自动移除最早的记录，授权后修改会自动写回原始文件，浏览器额外保存草稿。</p></div><div>${icon('keyboard', 22)}<h3>常用快捷键</h3><p>⌘ / Ctrl + B 加粗，I 斜体，S 保存，Z 撤销，Shift + Z 重做。</p></div></div><div class="help-notice">支持标题、粗体、斜体、删除线、链接、图片链接、列表、任务、引用、代码块与表格。支持 span 的 color 颜色与 font-weight 字重，以及 strong / b 加粗；其余 HTML 显示为文本。光标位于表格第一行时可调整整体宽度，拖动列间边界可调整列宽，Esc 取消拖动。文档包含本地相对路径图片时，可点击工具栏右侧「图片目录」，选择当前 Markdown 所在文件夹并授权只读访问。暂不支持数学公式与 Mermaid。请使用 Chrome 或 Edge 打开文件并允许读写。修改后停止输入约 0.45 秒会自动写回，写入成功后显示「已保存到原文件」。点击历史记录会重新读取原文件，需要时请求读写授权；读取失败会标明当前为旧草稿。<br>在可视化区域编辑后，Markdown 的空行、列表符号等格式可能会被统一整理。按住 ⌘ / Ctrl 点击文中链接可在新标签页打开。</div><button class="primary-button" data-action="close-modal">开始写作 ${icon('arrow', 16)}</button>`);
+  showModal(`${modalHeader('给想法，一个舒适的空间', '墨页 · Markdown 工作空间')}<div class="help-intro">点击「宽度」右侧的「切换显示模式」按钮，在源码和可视化之间切换，全屏时也可使用。两种模式的内容实时同步。</div><div class="help-grid"><div>${icon('split', 22)}<h3>双向编辑</h3><p>在源码模式编写 Markdown，或在可视化模式直接修改文字、列表与表格。</p></div><div>${icon('folder', 22)}<h3>打开本地文档</h3><p>点击左侧「打开文档」，选择 .md、.markdown 或 .txt 文件。</p></div><div>${icon('files', 22)}<h3>历史记录</h3><p>自动保留最近打开或编辑的 20 篇文档。超出后自动移除最早的记录，授权后修改会自动写回原始文件，浏览器额外保存草稿。</p></div><div>${icon('keyboard', 22)}<h3>常用快捷键</h3><p>⌘ / Ctrl + B 加粗，I 斜体，S 保存，Z 撤销，Shift + Z 重做。</p></div></div><div class="help-notice">支持标题、粗体、斜体、删除线、链接、图片链接、列表、任务、引用、代码块与表格。支持 span 的 color 颜色与 font-weight 字重，以及 strong / b 加粗；其余 HTML 显示为文本。光标位于表格第一行时可调整整体宽度，拖动列间边界可调整列宽，Esc 取消拖动。文档包含本地相对路径图片时，可点击工具栏右侧「图片目录」，选择当前 Markdown 所在文件夹并授权只读访问。暂不支持数学公式与 Mermaid。请使用 Chrome 或 Edge 打开文件并允许读写。修改后停止输入约 0.45 秒会自动写回，写入成功后显示「已保存到原文件」。点击历史记录会重新读取原文件，需要时请求读写授权；读取失败会标明当前为旧草稿。<br>在可视化区域编辑后，Markdown 的空行、列表符号等格式可能会被统一整理。按住 ⌘ / Ctrl 点击文中链接可在新标签页打开。</div><button class="primary-button" data-action="close-modal">开始写作 ${icon('arrow', 16)}</button>`);
 }
 
 function showLink(image = false) {
@@ -1033,7 +1083,7 @@ function showLink(image = false) {
       if (inSource) {
         source.setRangeText(`${image ? '!' : ''}[${text.replace(/[\[\]]/g, '')}](${url})`, start, end, 'end');
         source.focus(); changed('insert');
-      } else insertHTML(image ? `<img src="${escapeHTML(url)}" alt="${escapeHTML(text)}"><p><br></p>` : `<a href="${escapeHTML(url)}" rel="noopener noreferrer">${escapeHTML(text)}</a>`);
+      } else insertHTML(image ? `<img src="${escapeHTML(url)}" alt="${escapeHTML(text)}" contenteditable="false"><p><br></p>` : `<a href="${escapeHTML(url)}" rel="noopener noreferrer">${escapeHTML(text)}</a>`);
     });
   });
 }
@@ -1063,7 +1113,7 @@ const actions = {
   redo: () => applyHistory(1),
   more: () => togglePopover('#more-menu'),
   width: () => { togglePopover('#width-menu'); $('[data-action="width"]').setAttribute('aria-expanded', String(!$('#width-menu').hidden)); },
-  'display-mode': () => { togglePopover('#display-mode-menu'); $('[data-action="display-mode"]').setAttribute('aria-expanded', String(!$('#display-mode-menu').hidden)); },
+  'display-mode': () => setMode(mode === 'source' ? 'visual' : 'source'),
   'font-size': () => { togglePopover('#font-menu'); $('[data-action="font-size"]').setAttribute('aria-expanded', String(!$('#font-menu').hidden)); },
   'font-smaller': () => setFontSize(fontSize - 1),
   'font-larger': () => setFontSize(fontSize + 1),
@@ -1112,14 +1162,12 @@ document.addEventListener('click', event => {
     if (['bold', 'italic', 'strike', 'inline-code', 'bullet', 'number', 'quote'].includes(action)) format(action);
     else if (['task', 'rule', 'codeblock', 'table'].includes(action)) insertBlock(action);
     else actions[action]?.();
-    if (!['more', 'headings', 'insert', 'width', 'display-mode', 'reset-width', 'font-size', 'font-smaller', 'font-larger', 'reset-font'].includes(action)) closePopovers();
+    if (!['more', 'headings', 'insert', 'width', 'reset-width', 'font-size', 'font-smaller', 'font-larger', 'reset-font'].includes(action)) closePopovers();
   }
   if (documentButton) {
     const doc = documents.find(d => d.id === documentButton.dataset.document);
     if (doc) { $('#modal').close(); void openHistoryDocument(doc.id); }
   }
-  const displayMode = event.target.closest('[data-display-mode]');
-  if (displayMode) { setMode(displayMode.dataset.displayMode); closePopovers(); }
   const widthPreset = event.target.closest('[data-width]');
   if (widthPreset) { contentWidth = widthPreset.dataset.width === 'full' ? 'full' : Number(widthPreset.dataset.width); applyWidths(); save(); }
   if (headingButton) { format('heading', headingButton.dataset.heading); closePopovers(); }
@@ -1157,7 +1205,7 @@ window.addEventListener('beforeunload', event => {
     event.preventDefault(); event.returnValue = '';
   }
 });
-handleRestore.then(() => { renderFileSaveState(); refreshDocumentImages(); });
+handleRestore.then(() => { renderFileSaveState(); refreshDocumentImages(); void checkHistoryFileAvailability(); });
 for (const editor of [source, visual]) {
   editor.addEventListener('compositionstart', () => { composingDocument = true; });
   editor.addEventListener('compositionend', () => { composingDocument = false; void checkExternalModification(); });
@@ -1167,9 +1215,10 @@ window.addEventListener('storage', event => {
 });
 setInterval(() => { if (!document.hidden) syncSharedHistory(); }, 1000);
 setInterval(() => { void checkExternalModification(); }, 1500);
-window.addEventListener('focus', () => { syncSharedHistory(true); void checkExternalModification(); });
+setInterval(() => { void checkHistoryFileAvailability(); }, 15000);
+window.addEventListener('focus', () => { syncSharedHistory(true); void checkExternalModification(); void checkHistoryFileAvailability(); });
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) { syncSharedHistory(true); void checkExternalModification(); }
+  if (!document.hidden) { syncSharedHistory(true); void checkExternalModification(); void checkHistoryFileAvailability(); }
 });
 applyTheme();
 applyWidths();
