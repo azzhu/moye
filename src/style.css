@@ -335,3 +335,6 @@ dialog.appearance-dialog{width:780px;padding:25px;max-height:calc(100dvh - 40px)
 :root[data-style=ink] .brand-mark{background:transparent;color:var(--purple);border:1px solid var(--purple)}
 :root[data-style=midnight] .brand-mark{box-shadow:0 0 18px #9aaee51a}
 :root[data-style=charcoal] .brand-mark{background:var(--hover);color:var(--purple)}
+
+.edit-mode-toggle{flex-shrink:0}
+.edit-mode-toggle[aria-pressed=true]{color:var(--purple);background:var(--purple-wash);border-color:var(--purple)}

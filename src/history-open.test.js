@@ -172,8 +172,8 @@ test('history finishes an in-flight write before taking its disk snapshot', asyn
 });
 
 test('source and toolbar changes are blocked while original contents are loading', () => {
-  const context = { openingHistoryId: 'one', activeId: 'one', current: () => ({ id: 'one' }), fileWriters: new Map([['one', {}]]) };
+  const context = { editingEnabled: true, openingHistoryId: 'one', activeId: 'one', current: () => ({ id: 'one' }), fileWriters: new Map([['one', {}]]) };
   for (const name of ['changed', 'format', 'insertBlock', 'showLink', 'focusVisual', 'applyHistory']) {
-    assert.doesNotThrow(() => runInNewContext(functionSource(name) + `\n${name}();`, context));
+    assert.doesNotThrow(() => runInNewContext(functionSource('canEditDocument') + functionSource(name) + `\n${name}();`, context));
   }
 });

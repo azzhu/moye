@@ -13,7 +13,7 @@ test('successive table layout changes undo individually and schedule the restore
   const doc = { id: 'one', markdown: original };
   const saved = [];
   const context = {
-    activeId: 'one', documents: [doc], current: () => doc, histories: new Map(),
+    editingEnabled: true, activeId: 'one', documents: [doc], current: () => doc, histories: new Map(),
     lastEditKind: null, lastEditTime: 0, savedRange: null, openingHistoryId: null, resizingTable: false,
     fileWriters: new Map([['one', {}]]), source: { value: original }, visual: { innerHTML: '' },
     tableTools: { reset() {} }, updateHistoryButtons() {}, updateStats() {}, renderDocumentList() {}, save() {},
@@ -21,7 +21,7 @@ test('successive table layout changes undo individually and schedule the restore
     serializeMarkdown: visual => visual.innerHTML,
     scheduleOriginalSave: doc => saved.push(doc.markdown),
   };
-  const api = runInNewContext(['historyForDoc', 'recordHistory', 'changed', 'applyHistory'].map(historyFunction).join('\n') + `
+  const api = runInNewContext(['canEditDocument', 'historyForDoc', 'recordHistory', 'changed', 'applyHistory'].map(historyFunction).join('\n') + `
     ({ change(markdown) { historyForDoc(); lastEditKind = null; visual.innerHTML = markdown; changed('table-layout'); lastEditKind = null; }, undo() { applyHistory(-1); }, redo() { applyHistory(1); } });`, context);
   api.change(narrow); api.change(columns);
   assert.equal(doc.markdown, columns);

@@ -16,6 +16,7 @@ const STORAGE_KEY = 'inkwell.workspace.v1';
 let documents = [];
 let activeId = null;
 let mode = 'visual';
+let editingEnabled = false;
 let dark = false;
 let contentWidth = 1080;
 let fontSize = 16;
@@ -105,10 +106,10 @@ $('#app').innerHTML = `
   <div class="main-shell">
     <main class="workspace">
       <section class="editor-card" aria-label="Markdown 编辑器">
-        <div class="format-toolbar">${button('sidebar', 'menu', '打开历史记录', 'mobile-menu')}<div class="toolbar-group">${button('undo', 'undo', '撤销 ⌘ Z')}${button('redo', 'redo', '重做 ⌘ ⇧ Z')}</div><span class="toolbar-separator"></span><div class="dropdown-wrap"><button class="heading-select" data-action="headings"><span id="format-label">正文</span>${icon('down', 12)}</button><div id="headings-menu" class="popover headings-menu" hidden><button data-heading="p">正文</button><button data-heading="h1">一级标题 <small>H1</small></button><button data-heading="h2">二级标题 <small>H2</small></button><button data-heading="h3">三级标题 <small>H3</small></button></div></div><span class="toolbar-separator"></span><div class="toolbar-group">${button('bold', 'bold', '加粗 ⌘ B')}${button('italic', 'italic', '斜体 ⌘ I')}${button('strike', 'strike', '删除线')}${button('inline-code', 'code', '行内代码')}${button('link', 'link', '插入链接 ⌘ K')}</div><span class="toolbar-separator"></span><div class="toolbar-group">${button('bullet', 'list', '无序列表')}${button('number', 'ordered', '有序列表')}${button('quote', 'quote', '引用')}${button('table', 'table', '插入表格')}</div><span class="toolbar-separator toolbar-last"></span><div class="dropdown-wrap"><button class="insert-button" data-action="insert">${icon('plus', 15)}<span>插入</span>${icon('down', 11)}</button><div id="insert-menu" class="popover insert-menu" hidden><button data-action="task">${icon('task', 16)}任务清单</button><button data-action="codeblock">${icon('code', 16)}代码块</button><button data-action="rule">${icon('rule', 16)}分割线</button><button data-action="table">${icon('table', 16)}表格</button><button data-action="image">${icon('file', 16)}图片链接</button></div></div><span class="toolbar-spacer" title="双击进入或退出文档全屏"></span><div class="view-options"><button class="width-button image-directory-button" data-action="image-directory" aria-label="授权图片目录" title="授权图片目录：选择 Markdown 所在文件夹（只读）" hidden>${icon('folder', 15)}<span>图片目录</span></button><div class="dropdown-wrap"><button class="width-button" data-action="width" aria-label="调整可视化宽度" aria-expanded="false">${icon('split', 15)}<span>宽度</span>${icon('down', 11)}</button><div class="popover width-menu" id="width-menu" hidden><label for="content-width">正文宽度 <output id="width-value">1080 px</output></label><input id="content-width" type="range" min="480" max="1400" step="20" aria-label="可视化正文宽度"><div class="width-presets"><button data-width="640">紧凑</button><button data-width="960">宽屏</button><button data-width="full">铺满</button></div><p>正文宽度受当前可视化区域限制。</p><button class="width-reset" data-action="reset-width">恢复默认宽度</button></div></div><button class="width-button mode-setting" data-action="display-mode" aria-label="切换显示模式"><span>切换显示模式</span></button><div class="dropdown-wrap"><button class="font-button" data-action="font-size" aria-label="调整文档字体大小" aria-expanded="false" title="调整文档字体大小"><span aria-hidden="true">A<span class="font-small">a</span></span></button><div class="popover font-menu" id="font-menu" hidden><label for="font-size">字体大小 <output id="font-value">16 px</output></label><div class="font-stepper"><button data-action="font-smaller" aria-label="减小字体">−</button><input id="font-size" type="range" min="12" max="24" step="1" aria-label="文档字体大小"><button data-action="font-larger" aria-label="增大字体">+</button></div><p>调整文档显示字号，不改变 Markdown 内容。</p><button class="font-reset" data-action="reset-font">恢复默认字号</button></div></div>${button('outline', 'outline', '显示或隐藏文档大纲', 'outline-toggle active', 'aria-pressed="true"')}${button('focus', 'expand', '文档全屏', '', 'aria-pressed="false"')}</div></div>
+        <div class="format-toolbar">${button('sidebar', 'menu', '打开历史记录', 'mobile-menu')}<div class="toolbar-group">${button('undo', 'undo', '撤销 ⌘ Z')}${button('redo', 'redo', '重做 ⌘ ⇧ Z')}</div><span class="toolbar-separator"></span><div class="dropdown-wrap"><button class="heading-select" data-action="headings"><span id="format-label">正文</span>${icon('down', 12)}</button><div id="headings-menu" class="popover headings-menu" hidden><button data-heading="p">正文</button><button data-heading="h1">一级标题 <small>H1</small></button><button data-heading="h2">二级标题 <small>H2</small></button><button data-heading="h3">三级标题 <small>H3</small></button></div></div><span class="toolbar-separator"></span><div class="toolbar-group">${button('bold', 'bold', '加粗 ⌘ B')}${button('italic', 'italic', '斜体 ⌘ I')}${button('strike', 'strike', '删除线')}${button('inline-code', 'code', '行内代码')}${button('link', 'link', '插入链接 ⌘ K')}</div><span class="toolbar-separator"></span><div class="toolbar-group">${button('bullet', 'list', '无序列表')}${button('number', 'ordered', '有序列表')}${button('quote', 'quote', '引用')}${button('table', 'table', '插入表格')}</div><span class="toolbar-separator toolbar-last"></span><div class="dropdown-wrap"><button class="insert-button" data-action="insert">${icon('plus', 15)}<span>插入</span>${icon('down', 11)}</button><div id="insert-menu" class="popover insert-menu" hidden><button data-action="task">${icon('task', 16)}任务清单</button><button data-action="codeblock">${icon('code', 16)}代码块</button><button data-action="rule">${icon('rule', 16)}分割线</button><button data-action="table">${icon('table', 16)}表格</button><button data-action="image">${icon('file', 16)}图片链接</button></div></div><span class="toolbar-spacer" title="双击进入或退出文档全屏"></span><div class="view-options"><button class="width-button image-directory-button" data-action="image-directory" aria-label="授权图片目录" title="授权图片目录：选择 Markdown 所在文件夹（只读）" hidden>${icon('folder', 15)}<span>图片目录</span></button><div class="dropdown-wrap"><button class="width-button" data-action="width" aria-label="调整可视化宽度" aria-expanded="false">${icon('split', 15)}<span>宽度</span>${icon('down', 11)}</button><div class="popover width-menu" id="width-menu" hidden><label for="content-width">正文宽度 <output id="width-value">1080 px</output></label><input id="content-width" type="range" min="480" max="1400" step="20" aria-label="可视化正文宽度"><div class="width-presets"><button data-width="640">紧凑</button><button data-width="960">宽屏</button><button data-width="full">铺满</button></div><p>正文宽度受当前可视化区域限制。</p><button class="width-reset" data-action="reset-width">恢复默认宽度</button></div></div><button class="width-button mode-setting" data-action="display-mode" aria-label="切换显示模式"><span>切换显示模式</span></button><button class="width-button edit-mode-toggle" data-action="edit-mode" aria-label="切换只读与编辑模式" aria-pressed="false" title="当前只读，点击进入编辑模式"><span>只读模式</span></button><div class="dropdown-wrap"><button class="font-button" data-action="font-size" aria-label="调整文档字体大小" aria-expanded="false" title="调整文档字体大小"><span aria-hidden="true">A<span class="font-small">a</span></span></button><div class="popover font-menu" id="font-menu" hidden><label for="font-size">字体大小 <output id="font-value">16 px</output></label><div class="font-stepper"><button data-action="font-smaller" aria-label="减小字体">−</button><input id="font-size" type="range" min="12" max="24" step="1" aria-label="文档字体大小"><button data-action="font-larger" aria-label="增大字体">+</button></div><p>调整文档显示字号，不改变 Markdown 内容。</p><button class="font-reset" data-action="reset-font">恢复默认字号</button></div></div>${button('outline', 'outline', '显示或隐藏文档大纲', 'outline-toggle active', 'aria-pressed="true"')}${button('focus', 'expand', '文档全屏', '', 'aria-pressed="false"')}</div></div>
         <div class="editing-area" data-mode="visual">
-          <section class="source-pane"><div class="pane-heading"><span><span class="pane-dot source-dot"></span>MARKDOWN<span class="pane-subtitle">源码编辑</span></span><span class="file-extension">.md</span></div><div class="source-content"><div class="line-numbers" aria-hidden="true"></div><textarea id="source-editor" aria-label="Markdown 源码" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea></div><div class="pane-footer"><span>UTF-8</span><span id="cursor-position">行 1，列 1</span></div></section>
-          <section class="preview-pane"><div class="preview-scroll"><article id="visual-editor" class="prose" contenteditable="true" role="textbox" aria-label="可视化编辑内容" aria-multiline="true" spellcheck="false"></article></div></section>
+          <section class="source-pane"><div class="pane-heading"><span><span class="pane-dot source-dot"></span>MARKDOWN<span class="pane-subtitle">源码编辑</span></span><span class="file-extension">.md</span></div><div class="source-content"><div class="line-numbers" aria-hidden="true"></div><textarea id="source-editor" readonly aria-readonly="true" aria-label="Markdown 源码" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea></div><div class="pane-footer"><span>UTF-8</span><span id="cursor-position">行 1，列 1</span></div></section>
+          <section class="preview-pane"><div class="preview-scroll"><article id="visual-editor" class="prose" contenteditable="false" tabindex="0" role="textbox" aria-readonly="true" aria-label="可视化编辑内容" aria-multiline="true" spellcheck="false"></article></div></section>
           <aside class="outline-pane"><div class="outline-heading">文档大纲<span id="outline-count">0</span></div><nav id="outline-list" aria-label="文档大纲"></nav><div class="outline-note">${icon('feather', 19)}<p>专注当下的想法<br>剩下的，交给墨页。</p></div></aside>
         </div>
         <div class="editor-status"><button class="status-sync" data-action="save-file" title="保存到原始文件 / 重新授权"><span class="status-dot"></span><span id="sync-status">尚未打开原文件</span></button><div class="status-shortcuts" aria-label="快捷键提示">${icon('keyboard', 13)}<span><kbd>⌘ B</kbd> 加粗</span><span class="status-divider"></span><span><kbd>⌘ I</kbd> 斜体</span><span class="status-divider"></span><span><kbd>⌘ S</kbd> 保存</span></div><div class="status-metrics"><span id="status-words">0 字</span><span class="status-divider"></span><span id="status-lines">0 行</span><span class="status-divider"></span><span>Markdown</span></div></div>
@@ -126,7 +127,7 @@ const title = $('#document-title');
 const directoryImageLoader = new DirectoryImageLoader();
 const tableTools = installTableTools({
   editor: visual,
-  canEdit: () => !!current() && fileWriters.has(activeId) && openingHistoryId !== activeId && !composingDocument,
+  canEdit: () => canEditDocument() && !composingDocument,
   begin: () => { historyForDoc(); lastEditKind = null; },
   commit: () => { changed('table-layout'); lastEditKind = null; },
   busy: value => { resizingTable = value; },
@@ -263,10 +264,40 @@ function renderFileSaveState() {
   $('#save-state').classList.toggle('file-save-error', !!state?.error || !!state?.conflict || !!doc?.fileDirty);
 }
 
+function canEditDocument() {
+  return editingEnabled && !!current() && fileWriters.has(activeId) && openingHistoryId !== activeId;
+}
+
+async function toggleEditingMode() {
+  const doc = current();
+  if (!doc || openingHistoryId === activeId) return;
+  tableTools.reset();
+  closePopovers();
+  if (editingEnabled) editingEnabled = false;
+  else {
+    if (!fileWriters.has(doc.id)) await authorizeOriginalFile();
+    if (current() !== doc || openingHistoryId === doc.id || !fileWriters.has(doc.id)) return;
+    editingEnabled = true;
+  }
+  updateFileEditability();
+  updateHistoryButtons();
+}
+
 function updateFileEditability() {
-  const editable = !!current() && fileWriters.has(activeId) && openingHistoryId !== activeId;
+  const editable = canEditDocument();
   source.readOnly = !editable;
   visual.contentEditable = String(editable);
+  visual.setAttribute('aria-readonly', String(!editable));
+  source.setAttribute('aria-readonly', String(!editable));
+  const toggle = $('[data-action="edit-mode"]');
+  toggle.querySelector('span').textContent = editingEnabled ? '编辑模式' : '只读模式';
+  toggle.setAttribute('aria-pressed', String(editingEnabled));
+  toggle.title = editingEnabled ? '当前可编辑，点击切换为只读模式' : '当前只读，点击进入编辑模式';
+  toggle.disabled = !current() || openingHistoryId === activeId;
+  for (const action of ['headings', 'bold', 'italic', 'strike', 'inline-code', 'link', 'bullet', 'number', 'quote', 'table', 'insert', 'task', 'codeblock', 'rule', 'image']) {
+    $$(`[data-action="${action}"]`).forEach(button => { button.disabled = !editable; });
+  }
+  $$('[data-heading]').forEach(button => { button.disabled = !editable; });
   visual.querySelectorAll('input[type=checkbox]').forEach(input => { input.disabled = !editable; });
 }
 
@@ -382,7 +413,7 @@ async function authorizeOriginalFile() {
   const doc = current();
   if (!doc) return;
   if (openingHistoryId === doc.id) return;
-  if (fileSaveStates.get(doc.id)?.historyReadError || fileSaveStates.get(doc.id)?.historyReadOnly) { void openHistoryDocument(doc.id); return; }
+  if (fileSaveStates.get(doc.id)?.historyReadError || fileSaveStates.get(doc.id)?.historyReadOnly) return openHistoryDocument(doc.id);
   if (fileSaveStates.get(doc.id)?.conflict) { showFileConflict(doc); return; }
   const handle = fileHandles.get(doc.id);
   if (!handle) {
@@ -685,6 +716,7 @@ function updateStats() {
   $('#updated-label').textContent = relativeTime(current()?.updated || Date.now());
   updateNumbers();
   updateOutline();
+  updateFileEditability();
 }
 
 function updateOutline() {
@@ -728,12 +760,12 @@ function recordHistory(kind) {
 
 function updateHistoryButtons() {
   const history = historyForDoc();
-  $('[data-action="undo"]').disabled = openingHistoryId === activeId || !fileWriters.has(activeId) || !history || history.index === 0;
-  $('[data-action="redo"]').disabled = openingHistoryId === activeId || !fileWriters.has(activeId) || !history || history.index === history.entries.length - 1;
+  $('[data-action="undo"]').disabled = !canEditDocument() || !history || history.index === 0;
+  $('[data-action="redo"]').disabled = !canEditDocument() || !history || history.index === history.entries.length - 1;
 }
 
 function applyHistory(direction) {
-  if (openingHistoryId === activeId || !fileWriters.has(activeId)) return;
+  if (!canEditDocument()) return;
   tableTools.reset();
   const history = historyForDoc();
   if (!history) return;
@@ -787,6 +819,7 @@ async function openCommandLineDocument() {
 
 function loadDocument(id, readHistory = false) {
   tableTools.reset();
+  editingEnabled = false;
   historyOpenVersion++;
   openingHistoryId = readHistory ? id : null;
   activeId = id;
@@ -891,7 +924,7 @@ async function openHistoryDocument(id) {
 }
 
 function changed(kind) {
-  if (!current() || openingHistoryId === activeId || resizingTable || !fileWriters.has(activeId)) return;
+  if (!canEditDocument() || resizingTable) return;
   const doc = current();
   if (kind === 'source') {
     doc.markdown = source.value;
@@ -912,8 +945,12 @@ function changed(kind) {
 source.addEventListener('input', () => changed('source'));
 visual.addEventListener('input', () => changed('visual'));
 visual.addEventListener('change', event => { if (event.target.matches('input[type=checkbox]')) changed('task'); });
+for (const editor of [source, visual]) {
+  editor.addEventListener('beforeinput', event => { if (!canEditDocument()) event.preventDefault(); });
+}
 visual.addEventListener('paste', event => {
   event.preventDefault();
+  if (!canEditDocument()) return;
   document.execCommand('insertText', false, event.clipboardData.getData('text/plain'));
 });
 visual.addEventListener('click', event => {
@@ -964,7 +1001,7 @@ $('.toolbar-spacer').addEventListener('dblclick', event => {
 });
 
 function focusVisual() {
-  if (!current() || openingHistoryId === activeId || !fileWriters.has(activeId)) return false;
+  if (!canEditDocument()) return false;
   if (mode === 'source') {
     setMode('visual');
   }
@@ -994,7 +1031,7 @@ function insertHTML(html) {
 }
 
 function format(action, value) {
-  if (!current() || openingHistoryId === activeId || !fileWriters.has(activeId)) return;
+  if (!canEditDocument()) return;
   if (document.activeElement === source || mode === 'source') {
     if (action === 'bold') return sourceWrap('**');
     if (action === 'italic') return sourceWrap('*');
@@ -1068,11 +1105,11 @@ function selectReadingStyle(id) {
 }
 
 function showHelp() {
-  showModal(`${modalHeader('给想法，一个舒适的空间', '墨页 · Markdown 工作空间')}<div class="help-intro">点击「宽度」右侧的「切换显示模式」按钮，在源码和可视化之间切换，全屏时也可使用。两种模式的内容实时同步。</div><div class="help-grid"><div>${icon('split', 22)}<h3>双向编辑</h3><p>在源码模式编写 Markdown，或在可视化模式直接修改文字、列表与表格。</p></div><div>${icon('folder', 22)}<h3>打开本地文档</h3><p>点击左侧「打开文档」，选择 .md、.markdown 或 .txt 文件。</p></div><div>${icon('files', 22)}<h3>历史记录</h3><p>自动保留最近打开或编辑的 20 篇文档。超出后自动移除最早的记录，授权后修改会自动写回原始文件，浏览器额外保存草稿。</p></div><div>${icon('keyboard', 22)}<h3>常用快捷键</h3><p>⌘ / Ctrl + B 加粗，I 斜体，S 保存，Z 撤销，Shift + Z 重做。</p></div></div><div class="help-notice">支持标题、粗体、斜体、删除线、链接、图片链接、列表、任务、引用、代码块与表格。支持 span 的 color 颜色与 font-weight 字重，以及 strong / b 加粗；其余 HTML 显示为文本。光标位于表格第一行时可调整整体宽度，拖动列间边界可调整列宽，Esc 取消拖动。文档包含本地相对路径图片时，可点击工具栏右侧「图片目录」，选择当前 Markdown 所在文件夹并授权只读访问。暂不支持数学公式与 Mermaid。请使用 Chrome 或 Edge 打开文件并允许读写。修改后停止输入约 0.45 秒会自动写回，写入成功后显示「已保存到原文件」。点击历史记录会重新读取原文件，需要时请求读写授权；读取失败会标明当前为旧草稿。<br>在可视化区域编辑后，Markdown 的空行、列表符号等格式可能会被统一整理。按住 ⌘ / Ctrl 点击文中链接可在新标签页打开。</div><button class="primary-button" data-action="close-modal">开始写作 ${icon('arrow', 16)}</button>`);
+  showModal(`${modalHeader('给想法，一个舒适的空间', '墨页 · Markdown 工作空间')}<div class="help-intro">点击「宽度」右侧的「切换显示模式」按钮，在源码和可视化之间切换，全屏时也可使用。两种模式的内容实时同步。文档默认只读，点击右上角「只读模式」进入编辑模式后可修改。</div><div class="help-grid"><div>${icon('split', 22)}<h3>双向编辑</h3><p>在源码模式编写 Markdown，或在可视化模式直接修改文字、列表与表格。</p></div><div>${icon('folder', 22)}<h3>打开本地文档</h3><p>点击左侧「打开文档」，选择 .md、.markdown 或 .txt 文件。</p></div><div>${icon('files', 22)}<h3>历史记录</h3><p>自动保留最近打开或编辑的 20 篇文档。超出后自动移除最早的记录，授权后修改会自动写回原始文件，浏览器额外保存草稿。</p></div><div>${icon('keyboard', 22)}<h3>常用快捷键</h3><p>⌘ / Ctrl + B 加粗，I 斜体，S 保存，Z 撤销，Shift + Z 重做。</p></div></div><div class="help-notice">支持标题、粗体、斜体、删除线、链接、图片链接、列表、任务、引用、代码块与表格。支持 span 的 color 颜色与 font-weight 字重，以及 strong / b 加粗；其余 HTML 显示为文本。光标位于表格第一行时可调整整体宽度，拖动列间边界可调整列宽，Esc 取消拖动。文档包含本地相对路径图片时，可点击工具栏右侧「图片目录」，选择当前 Markdown 所在文件夹并授权只读访问。暂不支持数学公式与 Mermaid。请使用 Chrome 或 Edge 打开文件并允许读写。修改后停止输入约 0.45 秒会自动写回，写入成功后显示「已保存到原文件」。点击历史记录会重新读取原文件，需要时请求读写授权；读取失败会标明当前为旧草稿。<br>在可视化区域编辑后，Markdown 的空行、列表符号等格式可能会被统一整理。按住 ⌘ / Ctrl 点击文中链接可在新标签页打开。</div><button class="primary-button" data-action="close-modal">开始写作 ${icon('arrow', 16)}</button>`);
 }
 
 function showLink(image = false) {
-  if (!current() || openingHistoryId === activeId || !fileWriters.has(activeId)) return;
+  if (!canEditDocument()) return;
   const inSource = document.activeElement === source || mode === 'source';
   const start = source.selectionStart; const end = source.selectionEnd;
   const selected = inSource ? source.value.slice(start, end) : window.getSelection().toString();
@@ -1092,7 +1129,7 @@ function showLink(image = false) {
 }
 
 function insertBlock(action) {
-  if (!current() || openingHistoryId === activeId || !fileWriters.has(activeId)) return;
+  if (!canEditDocument()) return;
   const blocks = {
     task: { md: '- [ ] 新任务\n', html: '<ul><li class="task-item"><input type="checkbox" contenteditable="false" aria-label="任务状态"><span>新任务</span></li></ul><p><br></p>' },
     rule: { md: '\n---\n', html: '<hr><p><br></p>' },
@@ -1116,6 +1153,7 @@ const actions = {
   redo: () => applyHistory(1),
   width: () => { togglePopover('#width-menu'); $('[data-action="width"]').setAttribute('aria-expanded', String(!$('#width-menu').hidden)); },
   'display-mode': () => setMode(mode === 'source' ? 'visual' : 'source'),
+  'edit-mode': () => { void toggleEditingMode(); },
   'font-size': () => { togglePopover('#font-menu'); $('[data-action="font-size"]').setAttribute('aria-expanded', String(!$('#font-menu').hidden)); },
   'font-smaller': () => setFontSize(fontSize - 1),
   'font-larger': () => setFontSize(fontSize + 1),
