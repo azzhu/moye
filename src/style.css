@@ -191,6 +191,7 @@ body:not(.focus-mode) .editing-area .preview-scroll{padding-top:18px}
 :where(:root:not([data-theme=dark])) .prose pre code{color:#414658}
 :where(:root:not([data-theme=dark])) .prose li::marker{color:#686779}
 .prose ul>li:not(.task-item)::marker{font-size:1.2em;font-weight:700;color:var(--text)}
+.prose ol>li::marker{font-size:.85em}
 [data-theme=dark] .prose th{color:#696879}
 
 /* Compact document spacing without reducing text size. */
