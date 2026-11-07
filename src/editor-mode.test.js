@@ -25,7 +25,8 @@ test('switching modes preserves Markdown exactly and updates the button hint and
   const source = { value: original };
   const visual = { innerHTML: '<h1>文档</h1>' };
   const area = { dataset: {} };
-  const selector = {};
+  const label = {};
+  const selector = { querySelector: () => label, setAttribute(key, value) { this[key] = value; } };
   const calls = { resets: 0, saved: [] };
   const context = vm.createContext({
     source, visual, mode: 'visual',
@@ -40,7 +41,9 @@ test('switching modes preserves Markdown exactly and updates the button hint and
   for (const expected of ['source', 'visual', 'source', 'visual']) {
     toggle();
     assert.equal(area.dataset.mode, expected);
-    assert.equal(selector.title, `当前：${expected === 'source' ? '源码' : '可视化'}；点击切换为${expected === 'source' ? '可视化' : '源码'}`);
+    assert.equal(selector.title, `当前：${expected === 'source' ? '源码' : '渲染'}；点击切换为${expected === 'source' ? '渲染' : '源码'}`);
+    assert.equal(label.textContent, expected === 'source' ? '源码' : '渲染');
+    assert.equal(selector['aria-label'], selector.title);
     assert.equal(calls.saved.at(-1), area.dataset.mode);
     assert.equal(source.value, original);
     assert.equal(visual.innerHTML, '<h1>文档</h1>');
@@ -102,7 +105,7 @@ test('read-only/edit toggle controls both editors, tasks and toolbar without cha
     assert.equal(context.visual.contentEditable, String(editable));
     assert.equal(context.visual['aria-readonly'], String(!editable));
     assert.equal(checkbox.disabled, !editable);
-    assert.equal(get('[data-action="edit-mode"]').querySelector('span').textContent, editable ? '编辑模式' : '只读模式');
+    assert.equal(get('[data-action="edit-mode"]').querySelector('span').textContent, editable ? '编辑' : '只读');
     for (const action of ['bold', 'insert', 'table', 'undo', 'redo']) assert.equal(get(`[data-action="${action}"]`).disabled, !editable);
     assert.equal(doc.markdown, '# 保留原文');
     assert.equal(doc.fileDirty, true);
