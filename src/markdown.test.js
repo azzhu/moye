@@ -236,3 +236,15 @@ test('browser directory Blob URLs never enter the saved Markdown', () => {
   })])]);
   assert.equal(serializeMarkdown(root), '![说明](./images/图.png)\n');
 });
+
+test('literal input-rule markers round-trip through undo snapshots including a bare editor', () => {
+  for (const marker of ['# ', '## ', '### ', '- ', '* ', '1. ', '> ', '**重点**', '`代码`']) {
+    for (const children of [[element('p', [text(marker)])], [text(marker)]]) {
+      const markdown = serializeMarkdown(element('article', children));
+      const html = renderMarkdown(markdown);
+      assert.ok(!/<(?:h[1-6]|ul|ol|blockquote|strong|code)[ >]/.test(html), `${JSON.stringify(marker)} must remain literal on undo`);
+      assert.ok(!html.includes('\\'), `${JSON.stringify(marker)} must not show escape backslashes`);
+    }
+  }
+  assert.equal(serializeMarkdown(element('article', [element('p', [text('1. 普通文字')])])), '1\\. 普通文字\n');
+});

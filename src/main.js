@@ -9,6 +9,7 @@ import { refreshLocalImages } from './local-images.js';
 import { DirectoryImageLoader, imageDirectoryKey, validateImageDirectory } from './directory-images.js';
 import { refreshCodeCopyButtons } from './code-copy.js';
 import { installOutlineTracking } from './outline-tracking.js';
+import { installMarkdownInputRules } from './input-rules.js';
 import { APPEARANCE_STORAGE_KEY, READING_STYLES, resolveReadingStyle, applyReadingStyle } from './appearance.js';
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -946,7 +947,13 @@ function changed(kind) {
 }
 
 source.addEventListener('input', () => changed('source'));
-visual.addEventListener('input', () => changed('visual'));
+installMarkdownInputRules({
+  editor: visual,
+  enabled: () => mode === 'visual' && canEditDocument() && !resizingTable,
+  before: () => { changed('visual'); lastEditKind = null; },
+  commit: () => { changed('input-rule'); lastEditKind = null; },
+  plain: () => changed('visual'),
+});
 visual.addEventListener('change', event => { if (event.target.matches('input[type=checkbox]')) changed('task'); });
 for (const editor of [source, visual]) {
   editor.addEventListener('beforeinput', event => { if (!canEditDocument()) event.preventDefault(); });

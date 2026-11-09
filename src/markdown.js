@@ -28,7 +28,8 @@ export function inline(source) {
   const tokens = [];
   const stash = html => `\u0000${tokens.push(html) - 1}\u0000`;
   const restore = value => value.replace(/\u0000(\d+)\u0000/g, (_, i) => restore(tokens[Number(i)] || ''));
-  let text = String(source).replace(/\u0000/g, '').replace(/(`+)([^\n]*?)\1/g, (_, delimiter, code) => {
+  let text = String(source).replace(/\u0000/g, '').replace(/(`+)([^\n]*?)\1/g, (match, delimiter, code, offset, source) => {
+    if ((/\\+$/.exec(source.slice(0, offset))?.[0].length || 0) % 2) return match;
     if (code.startsWith(' ') && code.endsWith(' ') && code.trim()) code = code.slice(1, -1);
     return stash(`<code>${escapeHTML(code)}</code>`);
   });
@@ -148,7 +149,7 @@ export function renderMarkdown(markdown) {
 }
 
 function inlineMarkdown(node) {
-  if (node.nodeType === 3) return node.textContent.replace(/\u00a0/g, ' ').replace(/[\\`*_~\[\]<>]/g, '\\$&').replace(/^(\s*)(#{1,6}|[-+]|\d+\.)(?=\s)/, '$1\\$2');
+  if (node.nodeType === 3) return node.textContent.replace(/\u00a0/g, ' ').replace(/[\\`*_~\[\]<>]/g, '\\$&').replace(/^(\s*)(#{1,6}|[-+]|\d+\.)(?=\s)/, (_, indent, marker) => indent + (/^\d/.test(marker) ? marker.replace('.', '\\.') : '\\' + marker));
   if (node.nodeType !== 1) return '';
   const tag = node.tagName.toLowerCase();
   const children = () => [...node.childNodes].map(inlineMarkdown).join('');
@@ -178,7 +179,7 @@ function inlineMarkdown(node) {
 }
 
 function blockMarkdown(node, depth = 0) {
-  if (node.nodeType === 3) return node.textContent.trim() ? node.textContent : '';
+  if (node.nodeType === 3) return node.textContent.trim() ? inlineMarkdown(node) : '';
   if (node.nodeType !== 1) return '';
   const tag = node.tagName.toLowerCase();
   if (/^h[1-6]$/.test(tag)) return '#'.repeat(Number(tag[1])) + ' ' + inlineMarkdown(node);
