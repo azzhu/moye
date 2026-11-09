@@ -10,6 +10,7 @@ import { DirectoryImageLoader, imageDirectoryKey, validateImageDirectory } from 
 import { refreshCodeCopyButtons } from './code-copy.js';
 import { installOutlineTracking } from './outline-tracking.js';
 import { installMarkdownInputRules } from './input-rules.js';
+import { sourceIndentation, installIndentationShortcuts } from './indentation.js';
 import { APPEARANCE_STORAGE_KEY, READING_STYLES, resolveReadingStyle, applyReadingStyle } from './appearance.js';
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -954,6 +955,12 @@ installMarkdownInputRules({
   commit: () => { changed('input-rule'); lastEditKind = null; },
   plain: () => changed('visual'),
 });
+installIndentationShortcuts({
+  editor: visual,
+  enabled: () => mode === 'visual' && canEditDocument() && !composingDocument && !resizingTable,
+  before: () => { historyForDoc(); lastEditKind = null; },
+  commit: () => { changed('indentation'); lastEditKind = null; },
+});
 visual.addEventListener('change', event => { if (event.target.matches('input[type=checkbox]')) changed('task'); });
 for (const editor of [source, visual]) {
   editor.addEventListener('beforeinput', event => { if (!canEditDocument()) event.preventDefault(); });
@@ -978,11 +985,15 @@ function cursorPosition() {
 source.addEventListener('keyup', cursorPosition);
 source.addEventListener('click', cursorPosition);
 source.addEventListener('keydown', event => {
-  if (event.key === 'Tab') {
-    if (source.readOnly) return;
+  if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.isComposing) {
+    if (source.readOnly || composingDocument) return;
     event.preventDefault();
-    source.setRangeText('  ', source.selectionStart, source.selectionEnd, 'end');
-    changed('source');
+    const edit = sourceIndentation(source.value, source.selectionStart, source.selectionEnd, event.shiftKey);
+    if (source.value.slice(edit.start, edit.end) === edit.text) return;
+    historyForDoc(); lastEditKind = null;
+    source.setRangeText(edit.text, edit.start, edit.end, 'preserve');
+    source.setSelectionRange(edit.selectionStart, edit.selectionEnd);
+    changed('source'); lastEditKind = null;
   }
 });
 document.addEventListener('selectionchange', () => {
