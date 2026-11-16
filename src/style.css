@@ -35,17 +35,13 @@
 @media(max-width:1250px){.view-options .editable-hint{display:none}}
 @media(max-width:650px){.width-button{padding:0 7px;gap:4px}.width-menu{position:fixed;top:220px;right:14px;left:auto;width:min(270px,calc(100vw - 28px))}.editing-area[data-mode=visual] .preview-scroll{padding-left:22px;padding-right:22px}.focus-mode .width-menu{top:55px}}
 
-/* Keep shortcuts and document status on one compact bottom bar. */
+/* Filename on the left; save status and document metrics on the right. */
 .editor-status{gap:12px}
 .editor-status .status-sync{min-width:0;flex-shrink:1}
 .status-sync .status-dot{flex-shrink:0}
 .status-sync #sync-status{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.editor-status .status-shortcuts{gap:9px;min-width:0;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
-.status-shortcuts::-webkit-scrollbar{display:none}
-.status-shortcuts>span,.status-shortcuts>svg{flex-shrink:0}
-.status-shortcuts kbd{font-size:inherit;color:var(--subtle)}
 .editor-status .status-metrics{flex-shrink:0}
-@media(max-width:650px){.editor-status{gap:8px}.editor-status .status-sync{max-width:88px}.editor-status .status-shortcuts{gap:6px}.editor-status .status-metrics{gap:6px}}
+@media(max-width:650px){.editor-status{gap:8px}.editor-status .status-sync{max-width:88px}.editor-status .status-metrics{gap:6px}}
 
 /* The window defines the app height; long content scrolls inside its own pane. */
 html,body{height:100%;overflow:hidden;overscroll-behavior:none}
@@ -339,3 +335,14 @@ dialog.appearance-dialog{width:780px;padding:25px;max-height:calc(100dvh - 40px)
 
 .edit-mode-toggle{flex-shrink:0}
 .edit-mode-toggle[aria-pressed=true]{color:var(--purple);background:var(--purple-wash);border-color:var(--purple)}
+
+/* Long filenames wrap completely rather than losing their suffix to an ellipsis. */
+.editor-card .editor-status{height:auto;min-height:32px;padding-top:5px;padding-bottom:5px;align-items:center;line-height:1.5}
+.editor-status .status-filename{display:block;flex:1;min-width:0;color:var(--subtle);white-space:normal;overflow-wrap:anywhere;user-select:text}
+.editor-status .status-right{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-left:auto;min-width:0;max-width:65%}
+.editor-status .status-metrics{display:flex;align-items:center;gap:10px;white-space:nowrap}
+@media(max-width:650px){
+  .editor-status .status-right{max-width:52%;gap:4px;flex-wrap:wrap}
+  .editor-status .status-right .status-sync{max-width:100%}
+  .editor-status .status-metrics{gap:6px}
+}

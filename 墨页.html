@@ -42,17 +42,13 @@
 @media(max-width:1250px){.view-options .editable-hint{display:none}}
 @media(max-width:650px){.width-button{padding:0 7px;gap:4px}.width-menu{position:fixed;top:220px;right:14px;left:auto;width:min(270px,calc(100vw - 28px))}.editing-area[data-mode=visual] .preview-scroll{padding-left:22px;padding-right:22px}.focus-mode .width-menu{top:55px}}
 
-/* Keep shortcuts and document status on one compact bottom bar. */
+/* Filename on the left; save status and document metrics on the right. */
 .editor-status{gap:12px}
 .editor-status .status-sync{min-width:0;flex-shrink:1}
 .status-sync .status-dot{flex-shrink:0}
 .status-sync #sync-status{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.editor-status .status-shortcuts{gap:9px;min-width:0;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
-.status-shortcuts::-webkit-scrollbar{display:none}
-.status-shortcuts>span,.status-shortcuts>svg{flex-shrink:0}
-.status-shortcuts kbd{font-size:inherit;color:var(--subtle)}
 .editor-status .status-metrics{flex-shrink:0}
-@media(max-width:650px){.editor-status{gap:8px}.editor-status .status-sync{max-width:88px}.editor-status .status-shortcuts{gap:6px}.editor-status .status-metrics{gap:6px}}
+@media(max-width:650px){.editor-status{gap:8px}.editor-status .status-sync{max-width:88px}.editor-status .status-metrics{gap:6px}}
 
 /* The window defines the app height; long content scrolls inside its own pane. */
 html,body{height:100%;overflow:hidden;overscroll-behavior:none}
@@ -346,6 +342,17 @@ dialog.appearance-dialog{width:780px;padding:25px;max-height:calc(100dvh - 40px)
 
 .edit-mode-toggle{flex-shrink:0}
 .edit-mode-toggle[aria-pressed=true]{color:var(--purple);background:var(--purple-wash);border-color:var(--purple)}
+
+/* Long filenames wrap completely rather than losing their suffix to an ellipsis. */
+.editor-card .editor-status{height:auto;min-height:32px;padding-top:5px;padding-bottom:5px;align-items:center;line-height:1.5}
+.editor-status .status-filename{display:block;flex:1;min-width:0;color:var(--subtle);white-space:normal;overflow-wrap:anywhere;user-select:text}
+.editor-status .status-right{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-left:auto;min-width:0;max-width:65%}
+.editor-status .status-metrics{display:flex;align-items:center;gap:10px;white-space:nowrap}
+@media(max-width:650px){
+  .editor-status .status-right{max-width:52%;gap:4px;flex-wrap:wrap}
+  .editor-status .status-right .status-sync{max-width:100%}
+  .editor-status .status-metrics{gap:6px}
+}
 </style>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='13' fill='%23554be8'/%3E%3Cpath d='M13 32V16l11 10 11-10v16' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
   </head>
@@ -1948,7 +1955,7 @@ $('#app').innerHTML = `
           <section class="preview-pane"><div class="preview-scroll"><article id="visual-editor" class="prose" contenteditable="false" tabindex="0" role="textbox" aria-readonly="true" aria-label="可视化编辑内容" aria-multiline="true" spellcheck="false"></article></div></section>
           <aside class="outline-pane"><div class="outline-heading">文档大纲<span id="outline-count">0</span></div><nav id="outline-list" aria-label="文档大纲"></nav><div class="outline-note">${icon('feather', 19)}<p>专注当下的想法<br>剩下的，交给墨页。</p></div></aside>
         </div>
-        <div class="editor-status"><button class="status-sync" data-action="save-file" title="保存到原始文件 / 重新授权"><span class="status-dot"></span><span id="sync-status">尚未打开原文件</span></button><div class="status-shortcuts" aria-label="快捷键提示">${icon('keyboard', 13)}<span><kbd>⌘ B</kbd> 加粗</span><span class="status-divider"></span><span><kbd>⌘ I</kbd> 斜体</span><span class="status-divider"></span><span><kbd>⌘ S</kbd> 保存</span></div><div class="status-metrics"><span id="status-words">0 字</span><span class="status-divider"></span><span id="status-lines">0 行</span><span class="status-divider"></span><span>Markdown</span></div></div>
+        <div class="editor-status"><span class="status-filename" id="status-filename" aria-label="当前文件名"></span><div class="status-right"><button class="status-sync" data-action="save-file" title="保存到原始文件 / 重新授权"><span class="status-dot"></span><span id="sync-status">尚未打开原文件</span></button><div class="status-metrics"><span id="status-words">0 字</span><span class="status-divider"></span><span id="status-lines">0 行</span><span class="status-divider"></span><span>Markdown</span></div></div></div>
       </section>
       <section class="empty-state" hidden>${button('sidebar', 'menu', '打开历史记录', 'mobile-menu empty-history-toggle')}<div>${icon('files', 36)}</div><h2>打开文档，继续你的思路</h2><p>选择本地 Markdown 文件，或从左侧历史记录中继续编辑。</p><button class="new-button" data-action="open">${icon('folder', 16)}打开文档</button></section>
     </main>
@@ -2628,6 +2635,9 @@ function updatePageTitle() {
   document.title = name ? (/\.(md|markdown|txt)$/i.test(name) ? name : name + (current().extension || '.md')) : '墨页 · Markdown 工作空间';
   title.textContent = name || '';
   title.title = current()?.sourcePath || document.title;
+  const filename = current() ? (fileHandles.get(activeId)?.name || current().sourcePath?.split(/[\\/]/).at(-1) || document.title) : '';
+  $('#status-filename').textContent = filename;
+  $('#status-filename').title = filename;
 }
 
 
