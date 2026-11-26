@@ -25,7 +25,7 @@ export function extractDocumentTitle(markdown = '') {
     }
     if (!line.trim()) { index++; continue; }
     const heading = /^#\s+(.*)$/.exec(line);
-    return heading ? heading[1].replace(/\s+#+\s*$/, '').trim() : '';
+    return heading ? heading[1].replace(/(?:^|\s+)#+\s*$/, '').trim() : '';
   }
   return '';
 }
