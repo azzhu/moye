@@ -338,7 +338,9 @@ dialog.appearance-dialog{width:780px;padding:25px;max-height:calc(100dvh - 40px)
 
 /* Long filenames wrap completely rather than losing their suffix to an ellipsis. */
 .editor-card .editor-status{height:auto;min-height:32px;padding-top:5px;padding-bottom:5px;align-items:center;line-height:1.5}
-.editor-status .status-filename{display:block;flex:1;min-width:0;padding:0;text-align:left;font:inherit;color:var(--subtle);white-space:normal;overflow-wrap:anywhere;user-select:text}
+.editor-status .status-document{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
+.editor-status .status-document-title{min-width:0;max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.editor-status .status-filename{display:block;flex:0 1 auto;min-width:0;padding:0;text-align:left;font:inherit;color:var(--subtle);white-space:normal;overflow-wrap:anywhere;user-select:text}
 .editor-status .status-filename:hover:not(:disabled){color:var(--purple);text-decoration:underline}
 .editor-status .status-right{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-left:auto;min-width:0;max-width:65%}
 .editor-status .status-metrics{display:flex;align-items:center;gap:10px;white-space:nowrap}

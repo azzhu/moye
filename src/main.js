@@ -1,4 +1,4 @@
-import { renderMarkdown, serializeMarkdown, escapeHTML, safeURL } from './markdown.js';
+import { renderMarkdown, serializeMarkdown, escapeHTML, safeURL, inline } from './markdown.js';
 import { icon } from './icons.js';
 import { HISTORY_LIMIT, recentDocuments, migrateHistory } from './history.js';
 import { SharedHistoryStore, HISTORY_STORAGE_PREFIX, PAGE_DRAFT_STORAGE_KEY, restorePageDrafts } from './history-sync.js';
@@ -9,6 +9,7 @@ import { refreshLocalImages } from './local-images.js';
 import { DirectoryImageLoader, imageDirectoryKey, validateImageDirectory } from './directory-images.js';
 import { refreshCodeCopyButtons } from './code-copy.js';
 import { copyFilename } from './filename-copy.js';
+import { extractDocumentTitle } from './document-title.js';
 import { installOutlineTracking } from './outline-tracking.js';
 import { installMarkdownInputRules } from './input-rules.js';
 import { sourceIndentation, installIndentationShortcuts } from './indentation.js';
@@ -115,7 +116,7 @@ $('#app').innerHTML = `
           <section class="preview-pane"><div class="preview-scroll"><article id="visual-editor" class="prose" contenteditable="false" tabindex="0" role="textbox" aria-readonly="true" aria-label="可视化编辑内容" aria-multiline="true" spellcheck="false"></article></div></section>
           <aside class="outline-pane"><div class="outline-heading">文档大纲<span id="outline-count">0</span></div><nav id="outline-list" aria-label="文档大纲"></nav><div class="outline-note">${icon('feather', 19)}<p>专注当下的想法<br>剩下的，交给墨页。</p></div></aside>
         </div>
-        <div class="editor-status"><button type="button" class="status-filename" id="status-filename" data-action="copy-filename" aria-label="复制文件名（不含扩展名）" disabled></button><div class="status-right"><button class="status-sync" data-action="save-file" title="保存到原始文件 / 重新授权"><span class="status-dot"></span><span id="sync-status">尚未打开原文件</span></button><div class="status-metrics"><span id="status-words">0 字</span><span class="status-divider"></span><span id="status-lines">0 行</span><span class="status-divider"></span><span>Markdown</span></div></div></div>
+        <div class="editor-status"><div class="status-document"><button type="button" class="status-filename" id="status-filename" data-action="copy-filename" aria-label="复制文件名（不含扩展名）" disabled></button><span class="status-document-title" id="status-document-title" aria-label="文档大标题" hidden></span></div><div class="status-right"><button class="status-sync" data-action="save-file" title="保存到原始文件 / 重新授权"><span class="status-dot"></span><span id="sync-status">尚未打开原文件</span></button><div class="status-metrics"><span id="status-words">0 字</span><span class="status-divider"></span><span id="status-lines">0 行</span><span class="status-divider"></span><span>Markdown</span></div></div></div>
       </section>
       <section class="empty-state" hidden>${button('sidebar', 'menu', '打开历史记录', 'mobile-menu empty-history-toggle')}<div>${icon('files', 36)}</div><h2>打开文档，继续你的思路</h2><p>选择本地 Markdown 文件，或从左侧历史记录中继续编辑。</p><button class="new-button" data-action="open">${icon('folder', 16)}打开文档</button></section>
     </main>
@@ -708,6 +709,7 @@ function updateNumbers() {
 }
 
 function updateStats() {
+  updateDocumentTitle();
   refreshCodeCopyButtons(visual, toast);
   refreshDocumentImages();
   const text = visual.textContent || '';
@@ -788,6 +790,18 @@ function applyHistory(direction) {
   renderDocumentList();
   scheduleOriginalSave(current());
   updateStats(); updateHistoryButtons(); save();
+}
+
+/** 从当前文档首行标题生成纯文本并更新状态栏，无标题时隐藏，不改动文档。 */
+function updateDocumentTitle() {
+  const heading = extractDocumentTitle(current()?.markdown || '');
+  const template = document.createElement('template');
+  template.innerHTML = inline(heading);
+  const text = template.content.textContent.trim();
+  const label = $('#status-document-title');
+  label.textContent = text;
+  label.title = text;
+  label.hidden = !text;
 }
 
 function updatePageTitle() {
