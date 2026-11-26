@@ -25,12 +25,16 @@ test('opening a file explicitly reports stale background services while allowing
 
 function startupFixture(existing = []) {
   const handle = { id: 'one', name: '文档.md', path: '/tmp/文档.md' };
-  const calls = { opened: [], stored: [], messages: [], focused: 0 };
+  const calls = { opened: [], stored: [], messages: [], focused: 0, reads: 0, urls: [] };
   const context = {
-    historyOpenVersion: 1, window: { location: { hash: '#moye=token' } }, documents: existing,
+    historyOpenVersion: 1, window: {
+      location: { hash: '#moye=token', pathname: '/', search: '?view=1' },
+      performance: { getEntriesByType: () => [{ type: 'navigate' }] },
+      history: { state: { retained: true }, replaceState(state, unused, url) { calls.urls.push(url); assert.equal(state.retained, true); } },
+    }, URLSearchParams, documents: existing,
     historyStore: null,
     handleRestore: Promise.resolve(), fileHandles: new Map(),
-    localFileFromHash: async () => handle,
+    localFileFromHash: async () => { calls.reads++; return handle; },
     rememberFileHandle: async (id, handle) => calls.stored.push({ id, handle }),
     openHistoryDocument: async id => calls.opened.push(id),
     toast: message => calls.messages.push(message),
@@ -66,6 +70,36 @@ test('normal page startup stays empty, while slow command-line reads never overr
   const switched = startupFixture(); switched.context.localFileFromHash = async () => { switched.context.historyOpenVersion++; return switched.handle; };
   await switched.start(); assert.equal(switched.calls.opened.length, 0); assert.equal(switched.context.documents.length, 0);
   assert.equal(switched.calls.focused, 0);
+});
+
+test('refresh never reads or opens a residual command-line document and never enters fullscreen', async () => {
+  const doc = { id: 'old', markdown: '保留草稿', fileDirty: true };
+  const setup = startupFixture([doc]);
+  setup.context.window.performance.getEntriesByType = () => [{ type: 'reload' }];
+  await setup.start();
+  assert.equal(setup.calls.reads, 0);
+  assert.deepEqual(setup.calls.opened, []);
+  assert.equal(setup.calls.focused, 0);
+  assert.equal(setup.calls.stored.length, 0);
+  assert.equal(setup.context.documents[0], doc);
+  assert.equal(doc.markdown, '保留草稿');
+});
+
+test('startup consumes only moye from the URL, preserving unrelated location and history state', async () => {
+  const setup = startupFixture();
+  setup.context.window.location.hash = '#moye=token&section=intro';
+  await setup.start();
+  assert.deepEqual(setup.calls.urls, ['/?view=1#section=intro']);
+  assert.deepEqual(setup.calls.opened, ['local-one']);
+});
+
+test('command-line startup works without navigation timing or when URL cleanup is unavailable', async () => {
+  const setup = startupFixture();
+  delete setup.context.window.performance;
+  setup.context.window.history.replaceState = () => { throw new Error('blocked'); };
+  await setup.start();
+  assert.deepEqual(setup.calls.opened, ['local-one']);
+  assert.equal(setup.calls.focused, 1);
 });
 
 test('command-line startup keeps an already fullscreen document fullscreen', async () => {
