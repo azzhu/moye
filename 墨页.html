@@ -2710,7 +2710,17 @@ function updatePageTitle() {
 async function openCommandLineDocument() {
   const version = historyOpenVersion;
   try {
-    const handle = await localFileFromHash(window.location.hash);
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.replace(/^#/, ''));
+    if (params.has('moye')) {
+      params.delete('moye');
+      const remainingHash = params.toString();
+      try {
+        window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + (remainingHash ? `#${remainingHash}` : ''));
+      } catch { /* 地址清理受限时仍允许显式打开文件。 */ }
+    }
+    if (window.performance?.getEntriesByType?.('navigation')?.[0]?.type === 'reload') return;
+    const handle = await localFileFromHash(hash);
     if (!handle) return;
     await handleRestore;
     // A user's explicit document selection takes precedence over a slow startup read.
