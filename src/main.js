@@ -8,6 +8,7 @@ import { localFileFromHash } from './local-file-handle.js';
 import { refreshLocalImages } from './local-images.js';
 import { DirectoryImageLoader, imageDirectoryKey, validateImageDirectory } from './directory-images.js';
 import { refreshCodeCopyButtons } from './code-copy.js';
+import { copyFilename } from './filename-copy.js';
 import { installOutlineTracking } from './outline-tracking.js';
 import { installMarkdownInputRules } from './input-rules.js';
 import { sourceIndentation, installIndentationShortcuts } from './indentation.js';
@@ -114,7 +115,7 @@ $('#app').innerHTML = `
           <section class="preview-pane"><div class="preview-scroll"><article id="visual-editor" class="prose" contenteditable="false" tabindex="0" role="textbox" aria-readonly="true" aria-label="可视化编辑内容" aria-multiline="true" spellcheck="false"></article></div></section>
           <aside class="outline-pane"><div class="outline-heading">文档大纲<span id="outline-count">0</span></div><nav id="outline-list" aria-label="文档大纲"></nav><div class="outline-note">${icon('feather', 19)}<p>专注当下的想法<br>剩下的，交给墨页。</p></div></aside>
         </div>
-        <div class="editor-status"><span class="status-filename" id="status-filename" aria-label="当前文件名"></span><div class="status-right"><button class="status-sync" data-action="save-file" title="保存到原始文件 / 重新授权"><span class="status-dot"></span><span id="sync-status">尚未打开原文件</span></button><div class="status-metrics"><span id="status-words">0 字</span><span class="status-divider"></span><span id="status-lines">0 行</span><span class="status-divider"></span><span>Markdown</span></div></div></div>
+        <div class="editor-status"><button type="button" class="status-filename" id="status-filename" data-action="copy-filename" aria-label="复制文件名（不含扩展名）" disabled></button><div class="status-right"><button class="status-sync" data-action="save-file" title="保存到原始文件 / 重新授权"><span class="status-dot"></span><span id="sync-status">尚未打开原文件</span></button><div class="status-metrics"><span id="status-words">0 字</span><span class="status-divider"></span><span id="status-lines">0 行</span><span class="status-divider"></span><span>Markdown</span></div></div></div>
       </section>
       <section class="empty-state" hidden>${button('sidebar', 'menu', '打开历史记录', 'mobile-menu empty-history-toggle')}<div>${icon('files', 36)}</div><h2>打开文档，继续你的思路</h2><p>选择本地 Markdown 文件，或从左侧历史记录中继续编辑。</p><button class="new-button" data-action="open">${icon('folder', 16)}打开文档</button></section>
     </main>
@@ -796,7 +797,8 @@ function updatePageTitle() {
   title.title = current()?.sourcePath || document.title;
   const filename = current() ? (fileHandles.get(activeId)?.name || current().sourcePath?.split(/[\\/]/).at(-1) || document.title) : '';
   $('#status-filename').textContent = filename;
-  $('#status-filename').title = filename;
+  $('#status-filename').title = filename ? `${filename} — 点击复制文件名（不含扩展名）` : '';
+  $('#status-filename').disabled = !filename;
 }
 
 
@@ -1168,6 +1170,7 @@ function insertBlock(action) {
 }
 
 const actions = {
+  'copy-filename': () => { void copyFilename($('#status-filename').textContent, toast); },
   'image-directory': () => { void authorizeImageDirectory(); },
   'use-disk-version': () => { void useDiskVersion(); },
   open: openOriginalFile,
